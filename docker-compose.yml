@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - SEND_GRID_API_KEY=${SEND_GRID_API_KEY}
+    volumes:
+      - .:/app
+    command: flask run --host=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge

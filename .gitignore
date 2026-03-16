@@ -1,0 +1,123 @@
+﻿# ==================== SENSITIVE DATA ====================
+# Environment variables - NEVER commit secrets!
+.env
+.env.local
+.env.*.local
+.env.prod
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Sensitive user files
+users.json
+portfolio.json
+journal_trading.csv
+admin_audit.jsonl
+bot_trading.log
+*.log
+logs/
+
+# API Keys and credentials (anywhere in repo)
+.keys
+.secrets
+credentials.json
+client_secret*.json
+
+# ==================== PYTHON ====================
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.whl
+
+# ==================== IDE / EDITORS ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ==================== TESTING ====================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# ==================== BACKUPS ====================
+*.bak
+*.backup
+*~
+*.tmp
+*.temp
+
+# ==================== OS ====================
+Thumbs.db
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+# ==================== NODE (if using frontend tools) ====================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ==================== DOCKER ====================
+docker-compose.override.yml
+.dockerignore
+
+# ==================== BOT SPECIFIC ====================
+bot_trading_pour_ami/
+sauvegardes_conversation/
+*.bat
+pro_tab_partial.html
+BACKUP_COMPLET.py
+
+# ==================== COMPILED/GENERATED ====================
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.webassets-cache
+
+# ==================== IDE TEMP ====================
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+*.cer
+*.crt
+*.key
+*.pem
+

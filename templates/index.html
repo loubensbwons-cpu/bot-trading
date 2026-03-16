@@ -1,0 +1,2112 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bot Trading Crypto - Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
+    :root{--bg:#08131a;--bg2:#0f1f2a;--card:#11202b;--border:#223545;--green:#49d17d;--red:#ff6b7a;--yellow:#e7ba4a;--blue:#53b2ff;--purple:#7ca8ff;--text:#d6e6ef;--muted:#95abb9;--cyan:#42d9cf}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:radial-gradient(1200px 600px at 10% -10%,#143246 0%,transparent 60%),radial-gradient(1000px 500px at 100% 0%,#1d2f3e 0%,transparent 50%),linear-gradient(160deg,var(--bg),var(--bg2));color:var(--text);font-family:'Space Grotesk','Segoe UI',sans-serif;min-height:100vh}
+    header{backdrop-filter:blur(8px);background:rgba(17,32,43,.82);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo h1{font-size:20px;font-weight:700;color:#fff}
+    .logo span{font-size:13px;color:var(--muted)}
+    .status-badge{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;border:1px solid var(--border)}
+    .status-badge.running{background:rgba(63,185,80,.15);border-color:var(--green);color:var(--green)}
+    .status-badge.stopped{background:rgba(248,81,73,.15);border-color:var(--red);color:var(--red)}
+    .dot{width:8px;height:8px;border-radius:50%}
+    .running .dot{background:var(--green);animation:pulse 1.5s infinite}
+    .stopped .dot{background:var(--red)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    /* NAV TABS */
+    .nav-tabs{display:flex;gap:6px;padding:8px 24px;background:rgba(17,32,43,.78);border-bottom:1px solid var(--border);position:sticky;top:72px;z-index:4;backdrop-filter:blur(8px)}
+    .tab-btn{padding:10px 16px;background:transparent;border:1px solid transparent;border-radius:10px;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:#07131b;background:linear-gradient(135deg,var(--cyan),var(--blue));border-color:transparent}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    main{padding:24px 32px;max-width:1400px;margin:0 auto}
+    /* BOUTONS */
+    .controls{display:flex;gap:12px;margin-bottom:24px;align-items:center}
+    .btn{padding:12px 28px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px}
+    .btn-start{background:var(--green);color:#000}
+    .btn-start:hover{background:#52d468;transform:translateY(-1px)}
+    .btn-stop{background:var(--red);color:#fff}
+    .btn-stop:hover{background:#ff6b63;transform:translateY(-1px)}
+    .btn-save{background:var(--blue);color:#000;padding:10px 22px;font-size:14px}
+    .btn-save:hover{background:#79b8ff}
+    .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+    .mode-badge{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-left:8px}
+    .mode-sim{background:rgba(210,153,34,.2);color:var(--yellow);border:1px solid var(--yellow)}
+    .mode-reel{background:rgba(248,81,73,.2);color:var(--red);border:1px solid var(--red);animation:pulse 1.5s infinite}
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+    .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+    .stat-value{font-size:26px;font-weight:700;color:#fff}
+    .stat-sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .stat-card.green .stat-value{color:var(--green)}
+    .stat-card.blue .stat-value{color:var(--blue)}
+    .stat-card.yellow .stat-value{color:var(--yellow)}
+    .stat-card.purple .stat-value{color:var(--purple)}
+    .progress-bar{background:var(--border);border-radius:4px;height:6px;margin-top:10px}
+    .progress-fill{background:linear-gradient(90deg,var(--blue),var(--purple));height:100%;border-radius:4px;transition:width .5s ease}
+    /* GRILLES */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    @media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+    .panel{background:linear-gradient(170deg,rgba(17,32,43,.95),rgba(13,25,34,.95));border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+    .panel-header{padding:14px 20px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:space-between}
+    /* POSITIONS */
+    .positions-list{padding:12px 20px;min-height:80px}
+    .position-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+    .position-item:last-child{border-bottom:none}
+    .pos-symbol{font-weight:600;color:var(--blue)}
+    .pos-qty{font-size:13px;color:var(--muted)}
+    .pos-value{font-weight:600}
+    .up{color:var(--green)}
+    .no-data{color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
+    /* LOGS */
+    .log-box{height:320px;overflow-y:auto;padding:12px 16px;font-family:'Consolas',monospace;font-size:12px;line-height:1.7}
+    .log-box::-webkit-scrollbar{width:4px}
+    .log-box::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .log-line{display:flex;gap:10px}
+    .log-time{color:var(--muted);flex-shrink:0}
+    .log-INFO{color:var(--green)}
+    .log-DEBUG{color:var(--blue)}
+    .log-WARNING{color:var(--yellow)}
+    .log-ERROR,.log-CRITICAL{color:var(--red)}
+    /* JOURNAL */
+    .journal-scroll{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{padding:10px 16px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+    td{padding:10px 16px;border-bottom:1px solid rgba(48,54,61,.5)}
+    tr:last-child td{border-bottom:none}
+    .badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+    .badge-ACHAT{background:rgba(63,185,80,.2);color:var(--green)}
+    .badge-VENTE{background:rgba(248,81,73,.2);color:var(--red)}
+    .badge-GARDER{background:rgba(88,166,255,.2);color:var(--blue)}
+    /* CHART */
+    .chart-wrap{padding:16px 20px;height:220px}
+    /* SETTINGS */
+    .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+    @media(max-width:900px){.settings-grid{grid-template-columns:1fr}}
+    .settings-section{background:linear-gradient(170deg,rgba(17,32,43,.95),rgba(13,25,34,.95));border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+    .settings-section h3{font-size:16px;font-weight:700;color:#fff;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+    .form-group{margin-bottom:18px}
+    .form-label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+    .form-input{width:100%;padding:10px 14px;background:#0d1117;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;transition:border-color .2s}
+    .form-input:focus{outline:none;border-color:var(--blue)}
+    .form-input::placeholder{color:var(--muted)}
+    select.form-input{cursor:pointer}
+    .slider-wrap{display:flex;align-items:center;gap:14px}
+    input[type=range]{flex:1;accent-color:var(--blue);cursor:pointer}
+    .slider-val{background:#0d1117;border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-weight:700;color:var(--blue);min-width:60px;text-align:center}
+    .slider-limits{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+    .toggle-wrap{display:flex;align-items:center;gap:12px}
+    .toggle{position:relative;display:inline-block;width:48px;height:26px}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:26px;cursor:pointer;transition:.3s}
+    .toggle-slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+    input:checked+.toggle-slider{background:var(--red)}
+    input:checked+.toggle-slider:before{transform:translateX(22px)}
+    .toggle-label{font-size:14px;color:var(--text)}
+    .alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
+    .alert-success{background:rgba(63,185,80,.15);border:1px solid var(--green);color:var(--green)}
+    .alert-error{background:rgba(248,81,73,.15);border:1px solid var(--red);color:var(--red)}
+    .alert-warning{background:rgba(210,153,34,.15);border:1px solid var(--yellow);color:var(--yellow)}
+    .key-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:12px;margin-left:8px}
+    .key-ok{background:rgba(63,185,80,.15);color:var(--green);border:1px solid var(--green)}
+    .key-missing{background:rgba(248,81,73,.15);color:var(--red);border:1px solid var(--red)}
+    /* DEPOT */
+    .depot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:24px}
+    .depot-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
+    .depot-card h3{font-size:15px;font-weight:700;color:#fff;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+    .depot-card p{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:12px}
+    .depot-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+    .step-num{background:var(--blue);color:#000;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+    .step-text{font-size:13px;color:var(--text);line-height:1.5}
+    .step-text a{color:var(--blue);text-decoration:none}
+    .step-text a:hover{text-decoration:underline}
+    .depot-fee{font-size:11px;color:var(--muted);padding:8px 12px;background:#0d1117;border-radius:6px;margin-top:8px}
+    .warning-box{background:rgba(210,153,34,.1);border:1px solid var(--yellow);border-radius:10px;padding:16px 20px;margin-bottom:24px;display:flex;gap:12px;align-items:flex-start}
+    .warning-box .icon{font-size:20px;flex-shrink:0}
+    .warning-box p{font-size:13px;color:var(--yellow);line-height:1.6}
+    .warning-box strong{color:#fff}
+    footer{text-align:center;padding:16px;color:var(--muted);font-size:12px;border-top:1px solid var(--border);margin-top:8px}
+    /* AI PROVIDER SELECTOR */
+    .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:10px;margin-bottom:16px}
+    .provider-card{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:13px 8px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;user-select:none}
+    .provider-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 4px 12px rgba(88,166,255,.15)}
+    .provider-card.active{border-color:var(--blue);background:rgba(88,166,255,.1)}
+    .pc-name{font-weight:700;font-size:13px;color:#fff;margin-bottom:3px}
+    .pc-tag{font-size:10px;color:var(--muted)}
+    .provider-card.active .pc-name{color:var(--blue)}
+    .pc-rec{position:absolute;top:-7px;left:50%;transform:translateX(-50%);background:var(--yellow);color:#000;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap}
+    .ai-info-box{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .ai-info-col h4{font-size:12px;font-weight:700;margin-bottom:8px}
+    .pros h4{color:var(--green)}.cons h4{color:var(--red)}
+    .ai-info-col ul{list-style:none;padding:0;margin:0}
+    .ai-info-col li{font-size:12px;color:var(--muted);padding:2px 0;display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+    .ai-key-row{display:flex;gap:20px;align-items:flex-start}
+    @media(max-width:800px){.ai-key-row{flex-direction:column}.provider-grid{grid-template-columns:repeat(3,1fr)}}
+    .health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px}
+    .health-chip{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+    .health-chip .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+    .health-chip .v{font-size:14px;color:#fff;font-weight:700;margin-top:4px}
+    .inline-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px;cursor:pointer}
+    .btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+    .mini-select{background:#0d1117;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:8px;font-size:12px}
+    .profile-row{display:flex;gap:8px;flex-wrap:wrap}
+    .profile-btn{background:#0d1117;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+    .profile-btn:hover{border-color:var(--blue);color:var(--blue)}
+    .backtest-result{margin-top:10px;background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:1.6;color:var(--text);display:none}
+    .bt-wrap{display:grid;grid-template-columns:300px 1fr;gap:14px}
+    .bt-card{background:linear-gradient(170deg,rgba(17,32,43,.95),rgba(13,25,34,.95));border:1px solid var(--border);border-radius:12px;padding:18px}
+    .bt-chart{height:360px}
+    @media(max-width:1000px){.bt-wrap{grid-template-columns:1fr}.nav-tabs{top:66px;padding:8px 12px;overflow-x:auto;white-space:nowrap}}
+    .head-right{display:flex;align-items:center;gap:10px}
+    .user-chip{display:none;align-items:center;gap:8px;border:1px solid var(--border);background:#0c1a24;padding:7px 10px;border-radius:999px;font-size:12px;color:var(--text)}
+    .user-chip .admin{color:var(--yellow);font-weight:700}
+    .btn-mini{background:#0c1a24;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px;cursor:pointer;display:none}
+    .btn-mini:hover{border-color:var(--blue);color:var(--blue)}
+    .auth-overlay{position:fixed;inset:0;background:rgba(2,8,12,.85);backdrop-filter:blur(5px);z-index:20;display:none;align-items:center;justify-content:center;padding:18px}
+    .auth-card{width:min(540px,96vw);background:linear-gradient(170deg,rgba(17,32,43,.98),rgba(11,23,33,.98));border:1px solid var(--border);border-radius:16px;padding:20px}
+    .auth-tabs{display:flex;gap:8px;margin-bottom:12px}
+    .auth-tab{flex:1;border:1px solid var(--border);background:#0d1d28;color:var(--muted);padding:10px;border-radius:10px;cursor:pointer;font-weight:700}
+    .auth-tab.active{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#041018;border-color:transparent}
+    .auth-pane{display:none}
+    .auth-pane.active{display:block}
+    .quick-methods{margin:14px 0 14px 0}
+    .quick-methods .label{font-size:13px;color:var(--text);margin-bottom:12px;font-weight:600}
+    .quick-method-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .quick-method-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#0d1d28;border:1.5px solid var(--border);color:var(--text);padding:12px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;min-height:85px}
+    .quick-method-btn:hover{transform:translateY(-3px);box-shadow:0 8px 16px rgba(88,166,255,.15)}
+    .quick-method-btn svg{width:28px;height:28px}
+    .quick-method-btn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(66,217,207,.12);box-shadow:0 0 12px rgba(66,217,207,.2)}
+    .qm-icon{display:block;width:28px;height:28px;flex-shrink:0}
+    @media(max-width:520px){.quick-method-grid{grid-template-columns:repeat(2,1fr)}}
+    .admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+    .admin-card{background:#0f1d28;border:1px solid var(--border);border-radius:10px;padding:12px}
+    .admin-card .k{font-size:11px;color:var(--muted);text-transform:uppercase}
+    .admin-card .v{font-size:20px;color:#fff;font-weight:700;margin-top:6px}
+    .pro-plan-card{background:#0d1a24;border:1.5px solid var(--border);border-radius:12px;padding:15px;text-align:center;cursor:pointer;transition:all .2s}
+    .pro-plan-card:hover{border-color:var(--cyan);box-shadow:0 8px 16px rgba(66,217,207,.1)}
+    .pro-plan-card.current{border-color:var(--cyan);background:rgba(66,217,207,.08)}
+    .pro-plan-name{font-size:16px;font-weight:700;margin-bottom:8px}
+    .pro-plan-price{font-size:20px;color:var(--blue);font-weight:700;margin-bottom:8px}
+    .pro-plan-features{font-size:11px;color:var(--muted);list-style:none;padding:0;margin:10px 0}
+    .pro-plan-features li{padding:4px 0;border-bottom:1px solid var(--border)}
+    .pro-plan-features li:last-child{border:none}
+    /* MOBILE RESPONSIVE - Tablette & Mobile */
+    @media(max-width:768px){
+      header{padding:12px 16px}
+      .logo h1{font-size:16px}
+      main{padding:16px}
+      .controls{flex-wrap:wrap}
+      .stats-grid{grid-template-columns:repeat(2,1fr)}
+      .nav-tabs{padding:8px 12px}
+      .tab-btn{padding:8px 12px;font-size:13px}
+      .chart-container{height:250px}
+      .bt-chart{height:250px}
+      .bt-wrap{grid-template-columns:1fr}
+    }
+    @media(max-width:480px){
+      header{flex-direction:column;gap:12px;align-items:flex-start}
+      .head-right{width:100%}
+      .logo h1{font-size:14px}
+      main{padding:12px}
+      .stats-grid{grid-template-columns:1fr}
+      .stat-value{font-size:20px}
+      .nav-tabs{flex-wrap:wrap;gap:4px;padding:6px 8px}
+      .tab-btn{padding:6px 10px;font-size:12px}
+      .btn{padding:10px 16px;font-size:14px}
+      .panel{padding:12px;border-radius:8px}
+      .panel-header{font-size:16px;padding:12px;margin:0 0 12px 0}
+      .chart-container{height:200px}
+      .bt-chart{height:200px}
+      .form-input,.form-select{font-size:16px;padding:10px}
+      .auth-card{width:94vw}
+      .quick-method-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:360px){
+      .logo h1{font-size:12px}
+      .stat-value{font-size:16px}
+      .stat-label{font-size:10px}
+      .tab-btn{padding:4px 8px;font-size:11px}
+      .btn{padding:8px 12px;font-size:13px}
+      .panel-header{font-size:14px}
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <span style="font-size:28px">&#129302;</span>
+    <div>
+      <h1>Bot Trading Crypto</h1>
+      <span id="headerAiName">Architecture Cerveau &amp; Bras &mdash; DeepSeek V3</span>
+    </div>
+  </div>
+  <div class="head-right">
+    <div id="userChip" class="user-chip">
+      <span id="userChipName">-</span>
+      <span id="userChipAdmin" class="admin" style="display:none">ADMIN</span>
+    </div>
+    <button id="btnLogout" class="btn-mini" onclick="logoutUser()">D&eacute;connexion</button>
+    <div id="statusBadge" class="status-badge stopped">
+      <div class="dot"></div>
+      <span id="statusText">Arr&ecirc;t&eacute;</span>
+    </div>
+  </div>
+</header>
+
+<!-- ONGLETS -->
+<div class="nav-tabs">
+  <button class="tab-btn active" onclick="showTab('dashboard', this)">&#128200; Dashboard</button>
+  <button class="tab-btn" onclick="showTab('settings', this)">&#9881;&#65039; Param&egrave;tres</button>
+  <button class="tab-btn" onclick="showTab('backtest', this)">&#128202; Backtest</button>
+  <button class="tab-btn" onclick="showTab('pro', this)">&#11088; Outils PRO</button>
+  <button class="tab-btn" onclick="showTab('connexions', this)">🔗 Connexions</button>
+  <button class="tab-btn" onclick="showTab('depot', this)">&#128176; Abonnement</button>
+  <button id="tabAdminBtn" class="tab-btn" style="display:none" onclick="showTab('admin', this)">&#128274; Admin</button>
+</div>
+
+<!-- ==================== ONGLET DASHBOARD ==================== -->
+<div id="tab-dashboard" class="tab-content active">
+<main>
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart" onclick="startBot()">&#9654; Lancer le Bot</button>
+    <button class="btn btn-stop"  id="btnStop"  onclick="stopBot()" disabled>&#9632; Arr&ecirc;ter le Bot</button>
+    <span id="modeBadge" class="mode-badge mode-sim">&#127918; SIMULATION</span>
+    <span style="color:var(--muted);font-size:13px;margin-left:8px">Scan : <strong id="nbMarkets" style="color:var(--blue)">200</strong> march&eacute;s</span>
+  </div>
+  <div class="health-grid">
+    <div class="health-chip"><div class="k">PID</div><div class="v" id="healthPid">-</div></div>
+    <div class="health-chip"><div class="k">Uptime</div><div class="v" id="healthUptime">-</div></div>
+    <div class="health-chip"><div class="k">Dernier log</div><div class="v" id="healthLastLogAt">-</div></div>
+    <div class="health-chip"><div class="k">Erreurs</div><div class="v" id="healthErrors">0</div></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-label">&#128176; Solde disponible</div>
+      <div class="stat-value" id="solde">&mdash;</div>
+      <div class="stat-sub">Liquidit&eacute;s EUR</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">&#128200; Valeur totale</div>
+      <div class="stat-value" id="valeur">&mdash;</div>
+      <div class="stat-sub">Objectif : 50 000 &euro;</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">&#128260; Trades ex&eacute;cut&eacute;s</div>
+      <div class="stat-value" id="nbTrades">&mdash;</div>
+      <div class="stat-sub">Depuis le d&eacute;marrage</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">&#128202; Progression</div>
+      <div class="stat-value" id="progression">&mdash;</div>
+      <div class="stat-sub">Vers x5 depuis 10 000 &euro;</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">&#9989; Trades gagnants</div>
+      <div class="stat-value" id="gagnants">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">&#10060; Trades perdants</div>
+      <div class="stat-value" id="perdants">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">&#128201; Drawdown</div>
+      <div class="stat-value" id="drawdown">&mdash;</div>
+      <div class="stat-sub">Creux depuis le pic r&eacute;cent</div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">&#128201; &Eacute;volution du Portfolio</div>
+      <div class="chart-wrap"><canvas id="chartPortfolio"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">&#128188; Positions ouvertes</div>
+      <div class="positions-list" id="positionsList"><div class="no-data">Aucune position ouverte</div></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">&#128187; Logs en direct</div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span>&#128203; Journal des trades</span>
+        <div class="inline-tools">
+          <select id="journalFilter" class="mini-select" onchange="applyJournalFilter()">
+            <option value="ALL">Tous</option>
+            <option value="ACHAT">ACHAT</option>
+            <option value="VENTE">VENTE</option>
+            <option value="GARDER">GARDER</option>
+          </select>
+          <button class="btn-ghost" onclick="exportJournal()">Exporter CSV</button>
+        </div>
+      </div>
+      <div class="journal-scroll">
+        <table>
+          <thead><tr><th>Heure</th><th>Action</th><th>Symbole</th><th>Prix</th><th>Montant</th></tr></thead>
+          <tbody id="journalBody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Aucun trade pour l&apos;instant</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ==================== ONGLET PARAMETRES ==================== -->
+<div id="tab-settings" class="tab-content">
+<main>
+  <div class="settings-grid">
+    <!-- CLES API IA - PLEINE LARGEUR -->
+    <div class="settings-section" style="grid-column:1 / -1">
+      <h3>&#129504; Intelligence Artificielle
+        <span id="aiKeyBadge" class="key-status key-missing">&#10060; Non configur&eacute;e</span>
+      </h3>
+
+      <!-- CHOIX DU FOURNISSEUR -->
+      <div class="form-group">
+        <label class="form-label">Fournisseur d&apos;IA &mdash; choisissez le cerveau de votre bot (D&eacute;faut : DeepSeek)</label>
+        <div class="provider-grid">
+          <div class="provider-card active" id="pc-deepseek" onclick="selectProvider('deepseek')">
+            <div class="pc-rec">&#11088; D&eacute;faut</div>
+            <div class="pc-name">DeepSeek</div>
+            <div class="pc-tag">V3 / R1</div>
+          </div>
+          <div class="provider-card" id="pc-openai" onclick="selectProvider('openai')">
+            <div class="pc-name">OpenAI</div>
+            <div class="pc-tag">GPT-4o</div>
+          </div>
+          <div class="provider-card" id="pc-anthropic" onclick="selectProvider('anthropic')">
+            <div class="pc-name">Claude</div>
+            <div class="pc-tag">Anthropic</div>
+          </div>
+          <div class="provider-card" id="pc-gemini" onclick="selectProvider('gemini')">
+            <div class="pc-name">Gemini</div>
+            <div class="pc-tag">Google</div>
+          </div>
+          <div class="provider-card" id="pc-mistral" onclick="selectProvider('mistral')">
+            <div class="pc-name">Mistral &#127467;&#127479;</div>
+            <div class="pc-tag">Fran&ccedil;ais</div>
+          </div>
+          <div class="provider-card" id="pc-groq" onclick="selectProvider('groq')">
+            <div class="pc-name">Groq</div>
+            <div class="pc-tag">Ultra-rapide</div>
+          </div>
+          <div class="provider-card" id="pc-xai" onclick="selectProvider('xai')">
+            <div class="pc-name">Grok</div>
+            <div class="pc-tag">xAI</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEGENDE POINTS FORTS / FAIBLES -->
+      <div id="aiInfoBox" class="ai-info-box">
+        <div class="ai-info-col pros"><h4>&#9989; Points forts</h4><ul></ul></div>
+        <div class="ai-info-col cons"><h4>&#9888;&#65039; Points faibles</h4><ul></ul></div>
+      </div>
+
+      <!-- AVERTISSEMENT ANTHROPIC -->
+      <div id="aiAnthropicWarn" style="display:none;background:rgba(210,153,34,.1);border:1px solid var(--yellow);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--yellow);margin-bottom:14px">
+        &#9888; Claude n&apos;utilise pas l&apos;API OpenAI standard. Installez le package suppl&eacute;mentaire : <code style="background:#0d1117;padding:2px 6px;border-radius:4px;font-size:11px">pip install anthropic</code>
+      </div>
+
+      <!-- CLE API + MODELE -->
+      <div class="ai-key-row">
+        <div class="form-group" style="flex:1;min-width:0">
+          <label class="form-label">Cl&eacute; API <strong id="aiKeyLabel">DeepSeek</strong>
+            <span id="aiCurrentKeyBadge" class="key-status key-missing" style="margin-left:8px">&#10060; Requise</span>
+          </label>
+          <input type="password" class="form-input" id="aiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off"/>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">
+            Cr&eacute;ez votre cl&eacute; sur <a id="aiKeyLink" href="https://platform.deepseek.com/api-keys" target="_blank" style="color:var(--blue)">platform.deepseek.com</a>
+          </div>
+        </div>
+        <div class="form-group" style="min-width:240px">
+          <label class="form-label">Mod&egrave;le</label>
+          <select class="form-input" id="aiModel"></select>
+        </div>
+      </div>
+
+      <button class="btn btn-save" onclick="saveAI()">&#128190; Sauvegarder IA</button>
+      <button class="btn btn-save" style="margin-left:8px" onclick="testAIKey()">&#129514; Tester la cl&eacute;</button>
+      <div class="alert" id="alertAI"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>&#128737;&#65039; Contr&ocirc;les de risque (activables)</h3>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="riskDailyEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Stop-loss journalier</span></div>
+        <input class="form-input" id="riskDailyPct" type="number" step="0.1" min="0.1" max="50" placeholder="3.0" style="margin-top:8px"/>
+      </div>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="riskTradesHourEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Limiter les trades par heure</span></div>
+        <input class="form-input" id="riskTradesHour" type="number" step="1" min="1" max="100" placeholder="6" style="margin-top:8px"/>
+      </div>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="riskVolEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Filtre volatilit&eacute;</span></div>
+        <input class="form-input" id="riskVolPct" type="number" step="0.1" min="0.5" max="200" placeholder="12" style="margin-top:8px"/>
+      </div>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="riskSpreadEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Filtre spread bid/ask</span></div>
+        <input class="form-input" id="riskSpreadPct" type="number" step="0.01" min="0.01" max="50" placeholder="1.0" style="margin-top:8px"/>
+      </div>
+      <button class="btn btn-save" onclick="saveRiskControls()">&#128190; Sauvegarder risque</button>
+      <div class="alert" id="alertRisk"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>&#129504; Qualit&eacute; des d&eacute;cisions IA (activables)</h3>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="dualValidationEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Double validation IA + r&egrave;gles</span></div>
+      </div>
+      <div class="form-group">
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="promptAuditEnabled"/><span class="toggle-slider"></span></label><span class="toggle-label">Sauvegarder prompts/r&eacute;ponses pour audit</span></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Workers scan parall&egrave;le (1-20)</label>
+        <input class="form-input" id="scanWorkers" type="number" step="1" min="1" max="20" placeholder="6"/>
+      </div>
+      <button class="btn btn-save" onclick="saveAIQuality()">&#128190; Sauvegarder qualit&eacute;</button>
+      <div class="alert" id="alertAIQuality"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>&#9881;&#65039; Profils rapides</h3>
+      <div class="profile-row">
+        <button class="profile-btn" onclick="applyProfile('prudent')">Prudent</button>
+        <button class="profile-btn" onclick="applyProfile('equilibre')">Equilibr&eacute;</button>
+        <button class="profile-btn" onclick="applyProfile('agressif')">Agressif</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px">Applique instantan&eacute;ment des r&eacute;glages de risque/scan.</div>
+      <div class="alert" id="alertProfile"></div>
+    </div>
+
+    <!-- CLES API BINANCE -->
+    <div class="settings-section">
+      <h3>&#128279; Binance (Ordres r&eacute;els)
+        <span id="binKeyBadge" class="key-status key-missing">&#10060; Non configur&eacute;</span>
+      </h3>
+      <div class="form-group">
+        <label class="form-label">Binance API Key</label>
+        <input type="password" class="form-input" id="binKey" placeholder="Votre API Key Binance" autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Binance API Secret</label>
+        <input type="password" class="form-input" id="binSecret" placeholder="Votre API Secret Binance" autocomplete="off"/>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">
+          Cr&eacute;ez vos cl&eacute;s sur <a href="https://www.binance.com/fr/my/settings/api-management" target="_blank" style="color:var(--blue)">binance.com &rarr; API Management</a>
+        </div>
+      </div>
+      <button class="btn btn-save" onclick="saveBinance()">&#128190; Sauvegarder Binance</button>
+      <div class="alert alert-success" id="alertBinance"></div>
+    </div>
+
+    <!-- PARAMETRES BOT -->
+    <div class="settings-section">
+      <h3>&#9881;&#65039; Param&egrave;tres du Bot</h3>
+      <div class="form-group">
+        <label class="form-label">Nombre de march&eacute;s scann&eacute;s</label>
+        <div class="slider-wrap">
+          <input type="range" id="sliderMarkets" min="20" max="300" step="10" value="200" oninput="document.getElementById('sliderVal').textContent=this.value"/>
+          <div class="slider-val" id="sliderVal">200</div>
+        </div>
+        <div class="slider-limits"><span>20 (rapide)</span><span>&#9888; 300 (limite Binance)</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">
+          200 march&eacute;s = ~3 min/cycle &nbsp;|&nbsp; 300 = ~5 min/cycle &nbsp;|&nbsp; Au-del&agrave; de 300 : risque de ban Binance
+        </div>
+      </div>
+      <button class="btn btn-save" onclick="saveBot()">&#128190; Sauvegarder</button>
+      <div class="alert alert-success" id="alertBot"></div>
+    </div>
+
+    <!-- MODE REEL -->
+    <div class="settings-section">
+      <h3>&#9888;&#65039; Mode Trading R&eacute;el</h3>
+      <div style="background:rgba(248,81,73,.08);border:1px solid var(--red);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:var(--text);line-height:1.6">
+        <strong style="color:var(--red)">&#9888; ATTENTION &mdash; Argent r&eacute;el</strong><br/>
+        En mode r&eacute;el, le bot passera de <strong>vrais ordres</strong> sur Binance avec votre argent. N&eacute;cessite des cl&eacute;s API Binance valides avec permission &laquo; Trading &raquo;.
+      </div>
+      <div class="form-group">
+        <div class="toggle-wrap">
+          <label class="toggle">
+            <input type="checkbox" id="toggleReel" onchange="updateModeLabel()"/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label" id="modeLabel">&#127918; Mode Simulation (s&ucirc;r)</span>
+        </div>
+      </div>
+      <button class="btn btn-save" onclick="saveMode()">&#128190; Appliquer le mode</button>
+      <div class="alert" id="alertMode"></div>
+    </div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;font-size:13px;color:var(--muted)">
+    &#8505;&#65039; <strong style="color:var(--text)">Important :</strong> Apr&egrave;s avoir sauvegard&eacute; des param&egrave;tres, <strong style="color:var(--yellow)">arr&ecirc;tez et relancez le bot</strong> depuis l&apos;onglet Dashboard pour appliquer les changements.
+  </div>
+</main>
+</div>
+
+<!-- ==================== ONGLET PRO (2FA, SUBSCRIPTIONS, ALERTS, DCA, STATS) ==================== -->
+<div id="tab-pro" class="tab-content">
+<main style="padding:20px">
+  <h2 style="margin-bottom:20px">📊 Mes Features & Configuration</h2>
+  
+  <!-- PLAN STATUS -->
+  <div style="background:linear-gradient(135deg,rgba(25,60,100,.5),rgba(15,40,70,.5));border:1px solid rgba(52,152,219,0.3);border-radius:12px;padding:16px;margin-bottom:24px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px">PLAN ACTUEL</div>
+        <div style="font-size:20px;font-weight:700;color:#3498db" id="proSubscriptionPlan">Chargement...</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px">EXPIRE LE</div>
+        <div style="font-size:14px;font-weight:700;color:#fff" id="proSubscriptionExpires">-</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center">
+        <a href="javascript:showTab('depot', event.target.closest('[onclick]'))" style="color:#3498db;text-decoration:none;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
+          🔄 Changer de plan
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION PRO FEATURES -->
+  <div id="proFeatureNotice" style="display:none;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--muted)">
+    💡 <strong>Note :</strong> Vous êtes actuellement sur le plan <strong id="proFeatureNoticeLevel">FREE</strong>. Certaines features ci-dessous nécessitent un plan PRO ou ENTERPRISE.
+  </div>
+
+  <div style="background:#0d1a24;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="margin-bottom:15px">🔐 2FA - Authentification Deux-Facteurs</h3>
+    <div id="pro2FASection"></div>
+  </div>
+
+  <div style="background:#0d1a24;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="margin-bottom:15px">🔔 Alertes (Telegram / Discord)</h3>
+    <div style="margin-bottom:15px">
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="proTelegramEnabled" onchange="saveAlertsConfig()"/>
+        <span>Activer Telegram</span>
+      </label>
+      <div style="background:#0a1017;padding:10px;border-radius:8px;margin-bottom:10px;display:none" id="proTelegramConfig">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Bot Token Telegram</label>
+          <input class="form-input" id="proTelegramToken" placeholder="ex: 123456:ABC..."/>
+        </div>
+        <div class="form-group" style="margin:8px 0 0 0">
+          <label class="form-label">Chat ID</label>
+          <input class="form-input" id="proTelegramChatID" placeholder="ex: 987654321"/>
+        </div>
+        <button class="btn btn-save" style="margin-top:8px;width:100%" onclick="testTelegramAlert()">Tester</button>
+      </div>
+    </div>
+    <div>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="proDiscordEnabled" onchange="saveAlertsConfig()"/>
+        <span>Activer Discord</span>
+      </label>
+      <div style="background:#0a1017;padding:10px;border-radius:8px;display:none" id="proDiscordConfig">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Webhook URL Discord</label>
+          <input class="form-input" id="proDiscordWebhook" placeholder="https://discordapp.com/api/webhooks/..."/>
+        </div>
+        <button class="btn btn-save" style="margin-top:8px;width:100%" onclick="testDiscordAlert()">Tester</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div style="background:#0d1a24;border:1px solid var(--border);border-radius:12px;padding:20px">
+      <h3 style="margin-bottom:15px">💰 DCA (Dollar Cost Averaging)</h3>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:15px">
+        <input type="checkbox" id="proDCAEnabled" onchange="updateDCAFields()"/>
+        <span>Activer DCA</span>
+      </label>
+      <div style="display:none" id="proDCAFields">
+        <div class="form-group">
+          <label class="form-label">Montant par achat (EUR)</label>
+          <input class="form-input" id="proDCAAmount" type="number" min="10" max="10000" step="10" value="100" style="width:100%"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Intervalle (heures)</label>
+          <input class="form-input" id="proDCAInterval" type="number" min="1" max="168" step="1" value="24" style="width:100%"/>
+        </div>
+        <button class="btn btn-save" style="width:100%" onclick="saveDCAConfig()">Sauvegarder</button>
+      </div>
+    </div>
+    <div style="background:#0d1a24;border:1px solid var(--border);border-radius:12px;padding:20px">
+      <h3 style="margin-bottom:15px">🎯 Take-Profit</h3>
+      <div>
+        <label class="form-label">Pourcentage profit a encaisser (%)</label>
+        <input class="form-input" id="proTakeProfitPct" type="number" min="0.1" max="500" step="0.5" value="10" style="width:100%;margin-bottom:15px"/>
+        <button class="btn btn-save" style="width:100%" onclick="saveTakeProfitConfig()">Sauvegarder</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#0d1a24;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="margin-bottom:15px">📈 Statistiques Detaillees</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:15px">
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">TOTAL TRADES</div>
+        <div style="font-size:16px;font-weight:700" id="statsDetailedTotalTrades">-</div>
+      </div>
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">WIN RATE</div>
+        <div style="font-size:16px;font-weight:700;color:var(--green)" id="statsDetailedWinRate">-</div>
+      </div>
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">PROFIT TOTAL</div>
+        <div style="font-size:16px;font-weight:700;color:var(--blue)" id="statsDetailedTotalProfit">-</div>
+      </div>
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">SHARPE RATIO</div>
+        <div style="font-size:16px;font-weight:700" id="statsDetailedSharpe">-</div>
+      </div>
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">VOLATILITY</div>
+        <div style="font-size:16px;font-weight:700" id="statsDetailedVolatility">-</div>
+      </div>
+      <div style="background:#0a1017;padding:12px;border-radius:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">AVG PROFIT/TRADE</div>
+        <div style="font-size:16px;font-weight:700" id="statsDetailedAvgProfit">-</div>
+      </div>
+    </div>
+    <button class="btn btn-save" style="width:100%" onclick="loadDetailedStats()">Rafraichir les stats</button>
+  </div>
+</main>
+</div>
+<div id="tab-backtest" class="tab-content">
+<main>
+  <div class="bt-wrap">
+    <div class="bt-card">
+      <h3 style="font-size:16px;margin-bottom:12px">&#128202; Backtest d&eacute;di&eacute; RSI</h3>
+      <div class="form-group"><label class="form-label">Symbole</label><input class="form-input" id="btSymbol" value="BTC/USDT"/></div>
+      <div class="form-group"><label class="form-label">Timeframe</label><input class="form-input" id="btTimeframe" value="1h"/></div>
+      <div class="form-group"><label class="form-label">Bougies (100-1000)</label><input class="form-input" id="btLimit" type="number" min="100" max="1000" value="300"/></div>
+      <div class="form-group"><label class="form-label">RSI achat</label><input class="form-input" id="btBuyRsi" type="number" min="5" max="50" value="30"/></div>
+      <div class="form-group"><label class="form-label">RSI vente</label><input class="form-input" id="btSellRsi" type="number" min="50" max="95" value="70"/></div>
+      <button class="btn btn-save" onclick="runBacktest()">&#9654; Lancer backtest</button>
+      <div class="backtest-result" id="backtestResult"></div>
+    </div>
+    <div class="bt-card">
+      <div class="panel-header" style="padding:0 0 12px 0;border:none">Courbe d&apos;&eacute;quit&eacute; vs Buy &amp; Hold</div>
+      <div class="bt-chart"><canvas id="chartBacktest"></canvas></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ==================== ONGLET CONNEXIONS ==================== -->
+<div id="tab-connexions" class="tab-content">
+<main>
+  <div class="panel">
+    <div class="panel-header">🔗 Connexions & Intégrations</div>
+    
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <h4 style="margin-bottom:12px;color:var(--blue)">🔐 Google OAuth</h4>
+        <div id="googleStatus" style="font-size:13px;color:var(--muted);margin-bottom:12px">Non connecté</div>
+        <div id="googleSignInButtonContainer" style="display:flex;justify-content:center;margin:10px 0"></div>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <h4 style="margin-bottom:12px;color:var(--yellow)">📧 Email Confirmation</h4>
+        <div id="emailStatus" style="font-size:13px;color:var(--muted);margin-bottom:12px">Non confirmé</div>
+        <button class="btn btn-save" onclick="sendEmailConfirmation()" style="width:100%">Envoyer email confirmation</button>
+      </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:20px;border:1px solid var(--border);border-radius:8px;padding:12px">📊 Portefeuilles Multi-Exchange (Enterprise)</div>
+    
+    <div id="exchangesContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px">
+      <!-- Exchange cards will be inserted here -->
+    </div>
+    
+    <div style="background:rgba(66,217,207,.08);border:1px solid var(--cyan);border-radius:8px;padding:14px;margin-top:12px;font-size:13px">
+      <div style="color:var(--cyan);font-weight:700;margin-bottom:6px">💡 Exchanges supportés</div>
+      <div style="color:var(--muted);line-height:1.6">Binance • Coinbase • Kraken • KuCoin • Bybit • dYdX</div>
+    </div>
+
+    <button class="btn btn-save" onclick="showAddExchangeModal()" style="margin-top:14px;width:100%">➕ Connecter nouvel exchange</button>
+
+    <div class="panel-header" style="margin-top:24px;border:1px solid var(--border);border-radius:8px;padding:12px">🐋 Whale Alerts (On-Chain)</div>
+    
+    <div id="whaleAlertsContainer" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">État</div>
+          <div id="whaleStatus" style="font-size:14px;color:var(--muted)">Désactivé</div>
+        </div>
+        <button class="btn btn-save" onclick="toggleWhaleAlerts()" style="padding:8px 16px;font-size:13px">Activer</button>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
+        <div style="color:var(--muted);font-size:12px;margin-bottom:6px">Adresses à tracker (Ethereum)</div>
+        <div id="trackedAddressesList" style="font-size:12px;color:var(--text);background:#0d1d28;border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px;max-height:120px;overflow-y:auto">
+          Aucune adresse
+        </div>
+        <input class="form-input" id="addressInput" placeholder="0x..." style="margin-bottom:8px"/>
+        <button class="btn btn-save" onclick="addTrackedAddress()" style="width:100%;padding:8px;font-size:13px">Ajouter adresse</button>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
+        <label style="color:var(--muted);font-size:12px">Seuil d'alerte (EUR)</label>
+        <input type="number" class="form-input" id="whaleThreshold" value="10000" style="margin-top:4px"/>
+        <button class="btn btn-save" onclick="updateWhaleThreshold()" style="width:100%;padding:8px;margin-top:8px;font-size:13px">Mettre à jour</button>
+      </div>
+    </div>
+
+    <div id="whaleAlertsData" style="display:none;background:var(--bg2);border:1px solid var(--green);border-radius:8px;padding:14px;margin-top:12px;max-height:250px;overflow-y:auto">
+      <div style="color:var(--green);font-weight:700;margin-bottom:10px">🔔 Alertes récentes</div>
+      <div id="whaleAlertsList" style="font-size:12px;color:var(--text);line-height:1.8"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- MODAL: Connecter nouvel exchange -->
+<div id="addExchangeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:linear-gradient(170deg,rgba(17,32,43,.98),rgba(11,23,33,.98));border:1px solid var(--border);border-radius:16px;padding:24px;width:min(500px,96vw);max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3>Connecter une Exchange</h3>
+      <button onclick="closeAddExchangeModal()" style="background:none;border:none;font-size:24px;color:var(--text);cursor:pointer">&times;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Sélectionner exchange</label>
+      <select class="form-input" id="exchangeSelect">
+        <option value="">-- Choisir --</option>
+        <option value="binance">Binance</option>
+        <option value="coinbase">Coinbase</option>
+        <option value="kraken">Kraken</option>
+        <option value="kucoin">KuCoin</option>
+        <option value="bybit">Bybit</option>
+        <option value="dydx">dYdX</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">API Key</label>
+      <input class="form-input" id="exchangeApiKey" placeholder="Votre clé API publique" type="password"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">API Secret</label>
+      <input class="form-input" id="exchangeApiSecret" placeholder="Votre clé API secrète" type="password"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Sous-compte (optionnel)</label>
+      <input class="form-input" id="exchangeSubAccount" placeholder="Nom du sous-compte"/>
+    </div>
+    <button class="btn btn-save" onclick="connectExchange()" style="width:100%;margin-top:20px">Connecter</button>
+    <div class="alert" id="exchangeAlert" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ==================== ONGLET DEPOT ==================== -->
+<div id="tab-depot" class="tab-content">
+<div style="max-width:1200px;margin:0 auto;padding:20px">
+  
+  <!-- HEADER -->
+  <div style="text-align:center;margin-bottom:40px">
+    <h2 style="font-size:32px;font-weight:700;color:#fff;margin-bottom:10px">💳 Choisir un Plan</h2>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:20px">Accédez à plus de fonctionnalités avec un abonnement.</p>
+  </div>
+
+  <!-- SUBSCRIPTION CARDS -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-bottom:40px">
+    
+    <!-- FREE PLAN -->
+    <div style="background:linear-gradient(135deg,rgba(30,50,60,.8),rgba(20,35,45,.8));border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;transition:all 200ms ease">
+      <div style="position:absolute;top:-12px;left:20px;background:#4CAF50;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+        Populaire
+      </div>
+      <h3 style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">FREE</h3>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px">Essayez gratuitement</p>
+      <div style="font-size:32px;font-weight:700;color:#fff;margin-bottom:24px">
+        0€<span style="font-size:14px;color:var(--muted)">/mois</span>
+      </div>
+      <ul style="list-style:none;padding:0;margin-bottom:24px">
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ 5 paires max</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ 1 trade/heure</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ Mode simulation</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px">✓ Backtest basique</li>
+      </ul>
+      <button class="btn btn-save" style="width:100%;cursor:default">Actuellement actif</button>
+    </div>
+
+    <!-- PRO PLAN -->
+    <div style="background:linear-gradient(135deg,rgba(25,60,100,.9),rgba(15,40,70,.9));border:2px solid #3498db;border-radius:16px;padding:32px;position:relative;transform:scale(1.05);transition:all 200ms ease">
+      <div style="position:absolute;top:-12px;left:20px;background:#3498db;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+        ⭐ Recommandé
+      </div>
+      <h3 style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">PRO</h3>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px">Pour les traders actifs</p>
+      <div style="font-size:32px;font-weight:700;color:#3498db;margin-bottom:24px">
+        49€<span style="font-size:14px;color:var(--muted)">/mois</span>
+      </div>
+      <ul style="list-style:none;padding:0;margin-bottom:24px">
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ Paires illimitées</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ Alertes Telegram/Discord</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ DCA + Take-profit</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px">✓ API webhooks + 2FA</li>
+      </ul>
+      <button class="btn btn-save" onclick="initiatePayment('pro', 49)" style="width:100;background:#3498db;border-color:#3498db">
+        Passer à PRO
+      </button>
+    </div>
+
+    <!-- ENTERPRISE PLAN -->
+    <div style="background:linear-gradient(135deg,rgba(60,40,20,.8),rgba(40,25,10,.8));border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;transition:all 200ms ease">
+      <div style="position:absolute;top:-12px;left:20px;background:#f39c12;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+        Professionnel
+      </div>
+      <h3 style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px">ENTERPRISE</h3>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px">Pour les experts</p>
+      <div style="font-size:32px;font-weight:700;color:#fff;margin-bottom:24px">
+        199€<span style="font-size:14px;color:var(--muted)">/mois</span>
+      </div>
+      <ul style="list-style:none;padding:0;margin-bottom:24px">
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ Tout du Pro</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ 4+ exchanges</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)">✓ On-chain data</li>
+        <li style="padding:10px 0;color:var(--muted);font-size:13px">✓ Support Slack 24/7</li>
+      </ul>
+      <button class="btn btn-save" onclick="initiatePayment('enterprise', 199)" style="width:100%">
+        Passer à ENTERPRISE
+      </button>
+    </div>
+
+  </div>
+
+  <!-- PAIEMENT STRIPE MODAL -->
+  <div id="stripePaymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:linear-gradient(170deg,rgba(17,32,43,.98),rgba(11,23,33,.98));border:1px solid var(--border);border-radius:16px;padding:32px;width:min(500px,96vw);max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+        <h3 style="font-size:20px;font-weight:700;color:#fff;margin:0">Passer au paiement</h3>
+        <button onclick="closeStripeModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+      </div>
+
+      <div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:16px;margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="color:var(--muted)">Plan :</span>
+          <span style="color:#fff;font-weight:700" id="paymentPlanName">PRO</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-top:8px">
+          <span style="color:var(--muted)">Montant :</span>
+          <span style="color:#3498db;font-weight:700;font-size:18px" id="paymentAmount">49€</span>
+        </div>
+      </div>
+
+      <form id="stripeForm" style="margin-bottom:24px">
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:700">Adresse Email *</label>
+          <input type="email" id="stripeEmail" placeholder="vous@example.com" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#0a1017;color:#fff;font-size:13px" required>
+        </div>
+
+        <div id="stripe-card-element" style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#0a1017;margin-bottom:16px"></div>
+        <div id="stripe-error" style="color:#e74c3c;font-size:12px;margin-bottom:16px"></div>
+
+        <div style="display:flex;gap:10px">
+          <button type="button" onclick="closeStripeModal()" class="btn btn-ghost" style="flex:1">Annuler</button>
+          <button type="submit" class="btn btn-save" style="flex:1;background:#3498db;border-color:#3498db" id="stripeSubmitBtn">Payer 49€</button>
+        </div>
+      </form>
+
+      <div style="text-align:center;font-size:11px;color:var(--muted);padding-top:16px;border-top:1px solid var(--border)">
+        🔒 Paiement sécurisé par Stripe | Pas de frais cachés
+      </div>
+    </div>
+  </div>
+
+  <!-- AVANTAGES PLAN -->
+  <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:12px;padding:24px;margin-top:40px">
+    <h3 style="font-size:16px;font-weight:700;color:#fff;margin-bottom:16px">📋 Comparaison des Plans</h3>
+    <div style="font-size:12px;color:var(--muted);line-height:1.8">
+      <p><strong>FREE</strong> : Parfait pour apprendre. Limites standards. Toujours gratuit.</p>
+      <p><strong>PRO</strong> : Recommandé pour trader sérieusement. Le meilleur rapport qualité-prix.</p>
+      <p><strong>ENTERPRISE</strong> : Pour les pros. Support prioritaire + toutes les features.</p>
+      <p style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1)"><em>✓ Tous les plans incluent le trading réel sur Binance</em></p>
+    </div>
+  </div>
+
+</div>
+</div>
+      </div>
+      <div class="depot-fee">&#128181; Frais P2P : 0% Binance (prix fix&eacute; par le vendeur)</div>
+    </div>
+  </div>
+
+  <!-- ETAPES FINALES -->
+  <div style="background:var(--card);border:1px solid var(--green);border-radius:12px;padding:24px;margin-bottom:24px">
+    <h3 style="color:var(--green);font-size:16px;font-weight:700;margin-bottom:16px">&#9989; Apr&egrave;s avoir d&eacute;pos&eacute; des fonds &mdash; Activer le mode r&eacute;el</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+      <div class="depot-step"><div class="step-num">1</div><div class="step-text">Sur Binance : <strong>Profil &rarr; Gestion API &rarr; Cr&eacute;er une cl&eacute; API</strong><br/>Activer uniquement <em>Lecture + Trading spot</em></div></div>
+      <div class="depot-step"><div class="step-num">2</div><div class="step-text">Copier la <strong>API Key</strong> et le <strong>Secret</strong> &rarr; Onglet <strong>Param&egrave;tres</strong> &rarr; Section Binance</div></div>
+      <div class="depot-step"><div class="step-num">3</div><div class="step-text">Dans Param&egrave;tres &rarr; <strong>Activer le Mode R&eacute;el</strong> &rarr; Sauvegarder</div></div>
+      <div class="depot-step"><div class="step-num">4</div><div class="step-text">Retour sur Dashboard &rarr; <strong>Lancer le Bot</strong> &rarr; Le bot trade avec vos vrais fonds !</div></div>
+    </div>
+  </div>
+
+  <div style="background:rgba(248,81,73,.08);border:1px solid var(--red);border-radius:10px;padding:16px 20px;font-size:13px;color:var(--text);line-height:1.7">
+    &#9888;&#65039; <strong style="color:var(--red)">Avertissement legal :</strong> Le trading de cryptomonnaies comporte des risques &eacute;lev&eacute;s. Vous pouvez perdre tout ou partie de votre capital. Ne tradez qu&apos;avec de l&apos;argent que vous &ecirc;tes pr&ecirc;t &agrave; perdre. Ce bot est un outil exp&eacute;rimental &mdash; aucune garantie de profit.
+  </div>
+</main>
+</div>
+
+<!-- ==================== ONGLET ADMIN ==================== -->
+<div id="tab-admin" class="tab-content">
+<main>
+  <div class="panel" style="padding:18px">
+    <div class="panel-header" style="margin:-18px -18px 14px -18px">&#128274; Console administrateur (Jupiter)</div>
+    <div class="admin-grid">
+      <div class="admin-card"><div class="k">Utilisateurs</div><div id="admUsers" class="v">-</div></div>
+      <div class="admin-card"><div class="k">Admins</div><div id="admAdmins" class="v">-</div></div>
+      <div class="admin-card"><div class="k">Comptes actifs</div><div id="admActive" class="v">-</div></div>
+      <div class="admin-card"><div class="k">Trades logg&eacute;s</div><div id="admTrades" class="v">-</div></div>
+      <div class="admin-card"><div class="k">Bot</div><div id="admBot" class="v">-</div></div>
+      <div class="admin-card"><div class="k">Erreurs bot</div><div id="admErr" class="v">-</div></div>
+    </div>
+    <div class="panel-header" style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px">Comptes r&eacute;cents</div>
+    <div class="journal-scroll">
+      <table>
+        <thead><tr><th>Utilisateur</th><th>R&ocirc;le</th><th>Cr&eacute;&eacute; le</th><th>Dernier login</th><th>Etat</th><th>Action</th></tr></thead>
+        <tbody id="adminUsersBody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Aucune donn&eacute;e</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel-header" style="border:1px solid var(--border);border-radius:8px;margin:14px 0 8px 0">Changer mot de passe admin Jupiter</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px">
+      <div class="form-group" style="margin:0"><label class="form-label">Ancien mot de passe</label><input id="admOldPass" type="password" class="form-input"/></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Nouveau mot de passe</label><input id="admNewPass" type="password" class="form-input"/></div>
+      <button class="btn btn-save" onclick="changeAdminPassword()">Modifier</button>
+    </div>
+    <div class="alert" id="adminPwdAlert"></div>
+
+    <div class="panel-header" style="border:1px solid var(--border);border-radius:8px;margin:14px 0 8px 0">Journal admin</div>
+    <div class="journal-scroll">
+      <table>
+        <thead><tr><th>Heure</th><th>Acteur</th><th>Action</th><th>D&eacute;tails</th></tr></thead>
+        <tbody id="adminAuditBody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Aucune donn&eacute;e</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- AUTH OVERLAY -->
+<div id="authOverlay" class="auth-overlay">
+  <div class="auth-card">
+    <h3 style="margin-bottom:10px">Connexion / Cr&eacute;ation de compte</h3>
+    <div class="auth-tabs">
+      <button id="authTabLogin" class="auth-tab active" onclick="switchAuthTab('login')">Connexion</button>
+      <button id="authTabRegister" class="auth-tab" onclick="switchAuthTab('register')">Cr&eacute;er un compte</button>
+    </div>
+    <div id="authPaneLogin" class="auth-pane active">
+      <div class="form-group"><label class="form-label">Nom d&apos;utilisateur</label><input class="form-input" id="loginUser" placeholder="ex: Jupiter"/></div>
+      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="loginPass" placeholder="••••"/></div>
+      <button class="btn btn-save" onclick="loginUser()">Se connecter</button>
+    </div>
+    <div id="authPaneRegister" class="auth-pane">
+      <div class="form-group">
+        <label class="form-label">Type de compte</label>
+        <select class="form-input" id="regMethod" onchange="updateRegisterMethodFields()">
+          <option value="username">Nom d'utilisateur classique</option>
+          <option value="google">Compte Google</option>
+          <option value="gmail">Compte Gmail</option>
+          <option value="binance">Compte Binance</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Nom d&apos;utilisateur</label><input class="form-input" id="regUser" placeholder="3-32 caracteres"/></div>
+      <div id="regEmailWrap" class="form-group" style="display:none"><label class="form-label">Email</label><input class="form-input" id="regEmail" placeholder="ex: toi@gmail.com"/></div>
+      <div id="regBinanceWrap" class="form-group" style="display:none"><label class="form-label">Identifiant Binance</label><input class="form-input" id="regBinance" placeholder="UID / email Binance"/></div>
+      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="regPass" placeholder="minimum 4 caracteres"/></div>
+      <!-- Hidden Google button container for registration -->
+      <div id="googleSignupButtonContainer" style="display:none;position:absolute;left:-9999px;top:-9999px;"></div>
+      
+      <div class="quick-methods">
+        <div class="label">Ou créer instantanement avec :</div>
+        <div class="quick-method-grid">
+          <button type="button" class="quick-method-btn" data-method="google" onclick="triggerGoogleSignUpFlow('google')">
+            <svg class="qm-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#1F2937"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Google
+          </button>
+          <button type="button" class="quick-method-btn" data-method="gmail" onclick="triggerGoogleSignUpFlow('gmail')">
+            <svg class="qm-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="20" height="16" rx="2" fill="#EA4335"/><path d="M2 6l10 7.5L22 6" stroke="white" stroke-width="1.5" fill="none"/></svg>
+            Gmail
+          </button>
+          <button type="button" class="quick-method-btn" data-method="binance" onclick="selectRegisterMethod('binance')">
+            <svg class="qm-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" fill="#F3BA2F"/><path d="M8 8l4 4 4-4M8 12l4 4 4-4M12 4v16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Binance
+          </button>
+        </div>
+      </div>
+      <button class="btn btn-save" onclick="registerUser()">Cr&eacute;er le compte</button>
+    </div>
+    <div class="alert" id="authAlert"></div>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted)">Admin fixe: utilisateur <strong>Jupiter</strong> (mot de passe actuel: <strong>1234</strong>).</div>
+  </div>
+</div>
+
+<!-- MODAL SUBSCRIPTIONS PRO -->
+<div id="proSubscriptionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:linear-gradient(170deg,rgba(17,32,43,.98),rgba(11,23,33,.98));border:1px solid var(--border);border-radius:16px;padding:20px;width:min(700px,96vw);max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3>Plans &amp; Tarification</h3>
+      <button onclick="closeProSubscriptionModal()" style="background:none;border:none;font-size:24px;color:var(--text);cursor:pointer">&times;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;margin-bottom:20px" id="proSubscriptionPlans"></div>
+    <div style="background:#0d1d28;padding:15px;border-radius:8px;text-align:center;font-size:12px;color:var(--muted)">
+      Les paiements via Stripe seront disponibles bientot. Les upgrades actuels sont en mode test.
+    </div>
+  </div>
+</div>
+
+<footer>Bot de Trading Crypto v2.3 &mdash; DeepSeek V3 | Scan 200 march&eacute;s | Refresh automatique toutes les 3s</footer>
+
+<script>
+// ---- CHART ----
+const ctx=document.getElementById('chartPortfolio').getContext('2d');
+const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'Valeur (EUR)',data:[],borderColor:'#58a6ff',backgroundColor:'rgba(88,166,255,0.08)',borderWidth:2,pointRadius:2,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:6,font:{size:10}},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>v.toLocaleString('fr-FR')+' EUR'},grid:{color:'#21262d'}}}}});
+const btCtx=document.getElementById('chartBacktest').getContext('2d');
+const btChart=new Chart(btCtx,{type:'line',data:{labels:[],datasets:[
+  {label:'Strat\u00e9gie',data:[],borderColor:'#42d9cf',backgroundColor:'rgba(66,217,207,.08)',borderWidth:2,pointRadius:0,fill:true,tension:.25},
+  {label:'Buy & Hold',data:[],borderColor:'#ff8ea1',backgroundColor:'transparent',borderWidth:2,pointRadius:0,fill:false,tension:.25}
+]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#d6e6ef'}}},scales:{x:{ticks:{color:'#95abb9',maxTicksLimit:8},grid:{color:'#223545'}},y:{ticks:{color:'#95abb9'},grid:{color:'#223545'}}}}});
+function fmt(n){return parseFloat(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20ac'}
+let _allTrades=[];
+let _authUser=null;
+let _refreshTimer=null;
+let _adminTimer=null;
+const API_BASE=(window.location.protocol==='file:'?'http://localhost:5000':'');
+
+// Evite les erreurs CORS quand la page est ouverte en fichier local.
+if(window.location.protocol==='file:'){
+  window.location.replace('http://localhost:5000');
+}
+
+const _nativeFetch=window.fetch.bind(window);
+window.fetch=async function(url, opts={}){
+  const finalOpts=Object.assign({credentials:'same-origin'}, opts||{});
+  let finalUrl=url;
+  if(typeof url==='string' && url.startsWith('/')){
+    finalUrl=API_BASE+url;
+  }
+  try{
+    const resp=await _nativeFetch(finalUrl, finalOpts);
+    if(resp.status===401){
+      showAuthOverlay(true);
+    }
+    return resp;
+  }catch(err){
+    const msg=(API_BASE
+      ? 'Connexion impossible au serveur Flask sur http://localhost:5000. Lance app.py puis recharge la page.'
+      : 'Connexion serveur impossible. Verifie que Flask tourne puis recharge la page.');
+    if(document.getElementById('authAlert')){
+      showAlert('authAlert', msg, 'error');
+    }
+    console.error('Network error:', err);
+    throw err;
+  }
+};
+
+// ---- TABS ----
+function showTab(name, btn){
+  if(name==='admin' && (!_authUser || !_authUser.is_admin)) return;
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='settings') loadSettings();
+  if(name==='admin') loadAdminStats();
+  if(name==='pro') loadProTab();
+  if(name==='connexions') loadConnexionsTab();
+}
+
+function switchAuthTab(name){
+  document.getElementById('authTabLogin').classList.toggle('active', name==='login');
+  document.getElementById('authTabRegister').classList.toggle('active', name==='register');
+  document.getElementById('authPaneLogin').classList.toggle('active', name==='login');
+  document.getElementById('authPaneRegister').classList.toggle('active', name==='register');
+}
+
+function updateRegisterMethodFields(){
+  const m=(document.getElementById('regMethod')?.value)||'username';
+  document.getElementById('regEmailWrap').style.display=(m==='gmail'||m==='google')?'block':'none';
+  document.getElementById('regBinanceWrap').style.display=(m==='binance')?'block':'none';
+  document.querySelectorAll('.quick-method-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.method===m);
+  });
+}
+
+function selectRegisterMethod(method){
+  const sel=document.getElementById('regMethod');
+  if(!sel) return;
+  sel.value=method;
+  updateRegisterMethodFields();
+}
+
+function waitForGoogleSDK(callback, timeout = 5000) {
+  const start = Date.now();
+  
+  const checkSDK = () => {
+    if(window.google && window.google.accounts && window.google.accounts.id) {
+      console.log('✅ Google SDK is ready');
+      callback();
+    } else if(Date.now() - start < timeout) {
+      setTimeout(checkSDK, 100);
+    } else {
+      console.error('❌ Google SDK did not load within timeout');
+    }
+  };
+  
+  checkSDK();
+}
+
+function triggerGoogleSignUpFlow(method){
+  console.log('🔵 triggerGoogleSignUpFlow - START with method:', method);
+  
+  // Check if Google SDK is loaded
+  if(!window.google || !window.google.accounts || !window.google.accounts.id){
+    console.log('⏳ Google SDK not ready yet, waiting...');
+    waitForGoogleSDK(() => {
+      triggerGoogleSignUpFlow(method); // Retry after SDK loads
+    });
+    return;
+  }
+  
+  console.log('✅ Google SDK is fully loaded');
+  console.log('GOOGLE_CLIENT_ID_VAL:', GOOGLE_CLIENT_ID_VAL);
+  
+  if(!GOOGLE_CLIENT_ID_VAL) {
+    console.error('❌ GOOGLE_CLIENT_ID_VAL is empty, falling back to form');
+    selectRegisterMethod(method);
+    return;
+  }
+  
+  try {
+    // Initialize Google Sign-In if not already done
+    if(!window.google._gsiInitialized) {
+      console.log('Initializing Google Sign-In...');
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID_VAL,
+        callback: handleGoogleSignIn,
+        ux_mode: 'popup'
+      });
+      window.google._gsiInitialized = true;
+    }
+    
+    // Use prompt to show the One Tap or popup
+    console.log('Calling google.accounts.id.prompt()...');
+    google.accounts.id.prompt((notification) => {
+      console.log('Prompt notification:', notification);
+      if(notification.isNotDisplayed()){
+        console.log('Prompt was not displayed, fallback to form');
+        selectRegisterMethod(method);
+      }
+      if(notification.isSkippedMoment()){
+        console.log('Prompt was skipped, fallback to form');
+        selectRegisterMethod(method);
+      }
+      if(notification.isDismissedMoment()){
+        console.log('Prompt was dismissed by user');
+      }
+    });
+  } catch(e) {
+    console.error('❌ Error in Google signup flow:', e);
+    selectRegisterMethod(method);
+  }
+}
+
+function showAuthOverlay(show){
+  const ov=document.getElementById('authOverlay');
+  ov.style.display=show?'flex':'none';
+}
+
+function setAuthUser(user){
+  _authUser=user||null;
+  const chip=document.getElementById('userChip');
+  const chipName=document.getElementById('userChipName');
+  const admin=document.getElementById('userChipAdmin');
+  const logout=document.getElementById('btnLogout');
+  const adminBtn=document.getElementById('tabAdminBtn');
+  if(!_authUser){
+    chip.style.display='none';
+    logout.style.display='none';
+    adminBtn.style.display='none';
+    return;
+  }
+  chip.style.display='inline-flex';
+  logout.style.display='inline-block';
+  chipName.textContent=_authUser.username||'user';
+  admin.style.display=_authUser.is_admin?'inline':'none';
+  adminBtn.style.display=_authUser.is_admin?'inline-block':'none';
+}
+
+async function checkSession(){
+  try{
+    const r=await (await fetch('/api/auth/me')).json();
+    if(r.logged_in){
+      setAuthUser(r.user);
+      showAuthOverlay(false);
+      return true;
+    }
+  }catch(e){console.error(e)}
+  setAuthUser(null);
+  showAuthOverlay(true);
+  return false;
+}
+
+async function loginUser(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  if(!u||!p){
+    showAlert('authAlert','Entre ton nom d\'utilisateur et ton mot de passe.','warning');
+    return;
+  }
+  const r=await(await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})).json();
+  showAlert('authAlert', r.msg||'Erreur', r.ok?'success':'error');
+  if(!r.ok)return;
+  setAuthUser(r.user);
+  showAuthOverlay(false);
+  await loadSettings();
+  await refresh();
+  startPolling();
+}
+
+async function registerUser(){
+  const u=document.getElementById('regUser').value.trim();
+  const p=document.getElementById('regPass').value;
+  const method=(document.getElementById('regMethod')?.value)||'username';
+  const email=(document.getElementById('regEmail')?.value||'').trim();
+  const phone=(document.getElementById('regPhone')?.value||'').trim();
+  const binance=(document.getElementById('regBinance')?.value||'').trim();
+  if(!u||!p){
+    showAlert('authAlert','Remplis au moins nom d\'utilisateur + mot de passe.','warning');
+    return;
+  }
+  const payload={
+    username:u,
+    password:p,
+    signup_method:method,
+    email:email,
+    phone:phone,
+    binance_account:binance,
+  };
+  const r=await(await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json();
+  showAlert('authAlert', r.msg||'Erreur', r.ok?'success':'error');
+  if(r.ok){
+    document.getElementById('loginUser').value=u;
+    switchAuthTab('login');
+  }
+}
+
+async function logoutUser(){
+  await fetch('/api/auth/logout',{method:'POST'});
+  setAuthUser(null);
+  showAuthOverlay(true);
+  if(_refreshTimer){clearInterval(_refreshTimer);_refreshTimer=null}
+  if(_adminTimer){clearInterval(_adminTimer);_adminTimer=null}
+}
+
+async function loadAdminStats(){
+  if(!_authUser || !_authUser.is_admin) return;
+  try{
+    const r=await (await fetch('/api/admin/stats')).json();
+    if(!r.ok) return;
+    const s=r.stats||{};
+    document.getElementById('admUsers').textContent=s.total_users??0;
+    document.getElementById('admAdmins').textContent=s.admin_users??0;
+    document.getElementById('admActive').textContent=s.active_users??0;
+    document.getElementById('admTrades').textContent=s.trades_logged??0;
+    document.getElementById('admBot').textContent=s.bot_running?'ON':'OFF';
+    document.getElementById('admErr').textContent=s.bot_errors??0;
+    const body=document.getElementById('adminUsersBody');
+    const rows=r.recent_users||[];
+    if(!rows.length){
+      body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Aucune donnée</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map(u=>`<tr>
+      <td>${u.username||''}</td>
+      <td>${u.is_admin?'Admin':'User'}</td>
+      <td>${u.created_at||'-'}</td>
+      <td>${u.last_login||'-'}</td>
+      <td>${u.disabled?'Désactivé':'Actif'}</td>
+      <td>${u.is_admin?'-':`
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-ghost" onclick="toggleUserStatus('${(u.username||'').replace(/'/g,"\\'")}', ${!u.disabled})">${u.disabled?'Réactiver':'Désactiver'}</button>
+          <button class="btn-ghost" onclick="resetUserPassword('${(u.username||'').replace(/'/g,"\\'")}')">Reset mdp</button>
+        </div>`}
+      </td>
+    </tr>`).join('');
+
+    const auditBody=document.getElementById('adminAuditBody');
+    const evs=r.recent_audit||[];
+    if(!evs.length){
+      auditBody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Aucune donnée</td></tr>';
+    }else{
+      auditBody.innerHTML=evs.map(ev=>`<tr><td>${ev.timestamp||'-'}</td><td>${ev.actor||'-'}</td><td>${ev.action||'-'}</td><td>${JSON.stringify(ev.details||{})}</td></tr>`).join('');
+    }
+  }catch(e){console.error(e)}
+}
+
+async function toggleUserStatus(username, disable){
+  const action=disable?'désactiver':'réactiver';
+  const ok=confirm(`Confirmer: ${action} le compte ${username} ?`);
+  if(!ok)return;
+  const r=await(await fetch('/api/admin/user-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,disabled:disable})})).json();
+  showAlert('adminPwdAlert', r.msg||'Erreur', r.ok?'success':'error');
+  if(r.ok) loadAdminStats();
+}
+
+async function changeAdminPassword(){
+  const oldP=document.getElementById('admOldPass').value;
+  const newP=document.getElementById('admNewPass').value;
+  const r=await(await fetch('/api/admin/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:oldP,new_password:newP})})).json();
+  showAlert('adminPwdAlert', r.msg||'Erreur', r.ok?'success':'error');
+  if(r.ok){
+    document.getElementById('admOldPass').value='';
+    document.getElementById('admNewPass').value='';
+    loadAdminStats();
+  }
+}
+
+async function resetUserPassword(username){
+  const newPass=prompt(`Nouveau mot de passe pour ${username} (min 4 caractères):`);
+  if(newPass===null) return;
+  if((newPass||'').trim().length<4){
+    showAlert('adminPwdAlert','Mot de passe trop court (min 4).','error');
+    return;
+  }
+  const r=await(await fetch('/api/admin/reset-user-password',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:username,new_password:newPass.trim()})
+  })).json();
+  showAlert('adminPwdAlert', r.msg||'Erreur', r.ok?'success':'error');
+  if(r.ok) loadAdminStats();
+}
+
+// ---- STATUS ----
+function updateStatus(running,modeSim,nb){
+  const b=document.getElementById('statusBadge'),t=document.getElementById('statusText'),s=document.getElementById('btnStart'),p=document.getElementById('btnStop');
+  if(running){b.className='status-badge running';t.textContent='En cours\u2026';s.disabled=true;p.disabled=false}
+  else{b.className='status-badge stopped';t.textContent='Arr\u00eat\u00e9';s.disabled=false;p.disabled=true}
+  const mb=document.getElementById('modeBadge');
+  if(!modeSim){mb.className='mode-badge mode-reel';mb.textContent='\u26a0\ufe0f MODE R\u00c9EL'}
+  else{mb.className='mode-badge mode-sim';mb.textContent='\u1f3ae SIMULATION'}
+  if(nb) document.getElementById('nbMarkets').textContent=nb;
+}
+
+async function fetchStatus(){
+  try{
+    const d=await(await fetch('/api/status')).json();
+    updateStatus(d.running, d.mode_simulation!==false, d.top_n_markets);
+    document.getElementById('solde').textContent=fmt(d.solde_eur);
+    document.getElementById('valeur').textContent=fmt(d.valeur_totale);
+    document.getElementById('nbTrades').textContent=d.nb_trades;
+    document.getElementById('progression').textContent=d.progression+'%';
+    document.getElementById('progressBar').style.width=Math.min(d.progression,500)/5+'%';
+    const s=d.statistiques||{};
+    document.getElementById('gagnants').textContent=s.trades_gagnants??0;
+    document.getElementById('perdants').textContent=s.trades_perdants??0;
+    document.getElementById('drawdown').textContent=(d.drawdown_pct??0)+'%';
+    updateHealth(d.health||{});
+    const pos=d.positions||{},syms=Object.keys(pos),el=document.getElementById('positionsList');
+    el.innerHTML=syms.length===0?'<div class="no-data">Aucune position ouverte</div>':syms.map(s=>{const p=pos[s];return`<div class="position-item"><div><div class="pos-symbol">${s}</div><div class="pos-qty">${parseFloat(p.quantite).toFixed(6)} u</div></div><div style="text-align:right"><div class="pos-value">${fmt(p.cout_total_eur)}</div><div class="up" style="font-size:12px">@${parseFloat(p.prix_achat_eur).toFixed(4)} \u20ac</div></div></div>`}).join('');
+    if(d.historique&&d.historique.length>0){chart.data.labels=d.historique.map(h=>(h.timestamp||'').slice(11,16));chart.data.datasets[0].data=d.historique.map(h=>h.valeur_totale_eur);chart.update('none')}
+  }catch(e){console.error(e)}
+}
+
+function fmtSec(s){
+  s=parseInt(s||0);
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h>0)return `${h}h ${m}m`;
+  if(m>0)return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function updateHealth(h){
+  document.getElementById('healthPid').textContent=(h.pid??'-');
+  document.getElementById('healthUptime').textContent=fmtSec(h.uptime_sec||0);
+  document.getElementById('healthLastLogAt').textContent=h.last_log_at||'-';
+  document.getElementById('healthErrors').textContent=h.error_count??0;
+}
+
+async function fetchLogs(){
+  try{
+    const d=await(await fetch('/api/logs')).json();
+    const box=document.getElementById('logBox');
+    const atBottom=box.scrollHeight-box.clientHeight<=box.scrollTop+30;
+    box.innerHTML=d.logs.map(l=>{const lv=(l.msg.match(/\[(INFO|DEBUG|WARNING|ERROR|CRITICAL)\]/)||['','INFO'])[1];const m=l.msg.replace(/\x1b\[[0-9;]*m/g,'');return`<div class="log-line"><span class="log-time">${l.time}</span><span class="log-${lv}">${m}</span></div>`}).join('');
+    if(atBottom)box.scrollTop=box.scrollHeight;
+  }catch(e){}
+}
+
+async function fetchJournal(){
+  try{
+    const d=await(await fetch('/api/journal')).json();
+    _allTrades=d.trades||[];
+    applyJournalFilter();
+  }catch(e){}
+}
+
+function applyJournalFilter(){
+  const flt=(document.getElementById('journalFilter')?.value)||'ALL';
+  let rows=_allTrades;
+  if(flt!=='ALL') rows=rows.filter(t=>(t.action||'').toUpperCase()===flt);
+  const body=document.getElementById('journalBody');
+  if(!rows.length){
+    body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Aucun trade pour ce filtre</td></tr>';
+    return;
+  }
+  body.innerHTML=rows.map(t=>`<tr><td style="color:var(--muted)">${(t.timestamp||'').slice(11,19)}</td><td><span class="badge badge-${t.action}">${t.action}</span></td><td style="font-weight:600">${t.symbole}</td><td>${parseFloat(t.prix_eur||0).toFixed(4)} \u20ac</td><td>${parseFloat(t.montant_eur||0).toFixed(2)} \u20ac</td></tr>`).join('');
+}
+
+function exportJournal(){window.open('/api/journal/export','_blank')}
+
+async function startBot(){document.getElementById('btnStart').disabled=true;await fetch('/api/start',{method:'POST'});await fetchStatus()}
+async function stopBot(){document.getElementById('btnStop').disabled=true;await fetch('/api/stop',{method:'POST'});await fetchStatus()}
+async function refresh(){await fetchStatus();await fetchLogs();await fetchJournal()}
+
+// ---- AI PROVIDERS DATA ----
+const AI_PROVIDERS={
+  deepseek:{name:'DeepSeek',tag:'V3 / R1',
+    pros:['Excellent rapport qualit\u00e9/prix','Raisonnement avanc\u00e9 avec R1','API compatible OpenAI','Tr\u00e8s performant sur JSON structur\u00e9'],
+    cons:['Serveurs parfois lents aux heures de pointe','Donn\u00e9es limit\u00e9es au training (pas temps r\u00e9el)'],
+    models:[{id:'deepseek-chat',n:'deepseek-chat (V3) \u2b50 Recommand\u00e9'},{id:'deepseek-reasoner',n:'deepseek-reasoner (R1) \u2014 Chain-of-thought'}],
+    link:'https://platform.deepseek.com/api-keys',linkTxt:'platform.deepseek.com',ph:'sk-xxxxxxxxxxxxxxxxxxxxxxxx',ek:'deepseek_api_key',sk:'deepseek_key_set',sm:'deepseek_key_masked'},
+  openai:{name:'OpenAI',tag:'GPT-4o',
+    pros:['Le plus fiable et stable','Support JSON natif excellent','Tr\u00e8s bien document\u00e9','Mod\u00e8les de pointe (GPT-4o)'],
+    cons:['Le plus cher des fournisseurs','Donn\u00e9es propri\u00e9taires','D\u00e9pendance totale \u00e0 OpenAI Inc.'],
+    models:[{id:'gpt-4o',n:'GPT-4o \u2b50 Recommand\u00e9'},{id:'gpt-4o-mini',n:'GPT-4o Mini \u2014 Rapide & \u00e9conomique'},{id:'gpt-4-turbo',n:'GPT-4 Turbo \u2014 Tr\u00e8s performant'}],
+    link:'https://platform.openai.com/api-keys',linkTxt:'platform.openai.com',ph:'sk-xxxxxxxxxxxxxxxxxxxxxxxx',ek:'openai_api_key',sk:'openai_key_set',sm:'openai_key_masked'},
+  anthropic:{name:'Claude',tag:'Anthropic',
+    pros:['Excellent raisonnement logique et analytique','Tr\u00e8s fiable et s\u00fbr','Grande fen\u00eatre de contexte (200k tokens)','R\u00e9ponses structur\u00e9es de tr\u00e8s haute qualit\u00e9'],
+    cons:['N\u00e9cessite pip install anthropic','Plus cher que DeepSeek','API diff\u00e9rente de l\u2019OpenAI standard'],
+    models:[{id:'claude-3-5-sonnet-20241022',n:'Claude 3.5 Sonnet \u2b50 Recommand\u00e9'},{id:'claude-3-5-haiku-20241022',n:'Claude 3.5 Haiku \u2014 Rapide'},{id:'claude-3-opus-20240229',n:'Claude 3 Opus \u2014 Le plus puissant'}],
+    link:'https://console.anthropic.com/keys',linkTxt:'console.anthropic.com',ph:'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxx',ek:'anthropic_api_key',sk:'anthropic_key_set',sm:'anthropic_key_masked'},
+  gemini:{name:'Gemini',tag:'Google',
+    pros:['API OpenAI-compatible (migration facile)','Gratuit jusqu\u2019\u00e0 certaines limites','Multimodal et tr\u00e8s performant','Gemini 2.0 Flash ultra rapide'],
+    cons:['Restrictions selon les pays','Moins test\u00e9 pour le trading algorithmique','Mode JSON parfois instable sur certains mod\u00e8les'],
+    models:[{id:'gemini-2.0-flash',n:'Gemini 2.0 Flash \u2b50 Recommand\u00e9'},{id:'gemini-1.5-pro',n:'Gemini 1.5 Pro \u2014 Tr\u00e8s puissant'},{id:'gemini-1.5-flash',n:'Gemini 1.5 Flash \u2014 Ultra rapide'}],
+    link:'https://aistudio.google.com/app/apikey',linkTxt:'aistudio.google.com',ph:'AIzaSyxxxxxxxxxxxxxxxxxxxxxxxx',ek:'gemini_api_key',sk:'gemini_key_set',sm:'gemini_key_masked'},
+  mistral:{name:'Mistral',tag:'\ud83c\uddeb\ud83c\uddf7 Fran\u00e7ais',
+    pros:['Entreprise fran\u00e7aise (conformit\u00e9 RGPD)','API OpenAI-compatible','Bon rapport qualit\u00e9/prix','Certains mod\u00e8les open source'],
+    cons:['Moins performant que GPT-4 / Claude sur le raisonnement','\u00c9cosyst\u00e8me moins mature','JSON moins stable sur les petits mod\u00e8les'],
+    models:[{id:'mistral-large-latest',n:'Mistral Large \u2b50 Recommand\u00e9'},{id:'mistral-small-latest',n:'Mistral Small \u2014 \u00c9conomique'},{id:'codestral-latest',n:'Codestral \u2014 Sp\u00e9cialis\u00e9 code'}],
+    link:'https://console.mistral.ai/api-keys/',linkTxt:'console.mistral.ai',ph:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',ek:'mistral_api_key',sk:'mistral_key_set',sm:'mistral_key_masked'},
+  groq:{name:'Groq',tag:'Ultra-rapide',
+    pros:['Inf\u00e9rence hardware LPU ultra-rapide (< 1s)','API OpenAI-compatible','Mod\u00e8les open source (LLaMA)','Tr\u00e8s bon prix'],
+    cons:['Rate limits stricts (tokens/min limit\u00e9s)','Mod\u00e8les moins pr\u00e9cis que GPT-4/Claude','JSON mode non disponible sur tous les mod\u00e8les'],
+    models:[{id:'llama-3.3-70b-versatile',n:'LLaMA 3.3 70B \u2b50 Recommand\u00e9'},{id:'llama-3.1-8b-instant',n:'LLaMA 3.1 8B \u2014 Ultra rapide'},{id:'mixtral-8x7b-32768',n:'Mixtral 8x7B \u2014 \u00c9quilibre'}],
+    link:'https://console.groq.com/keys',linkTxt:'console.groq.com',ph:'gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',ek:'groq_api_key',sk:'groq_key_set',sm:'groq_key_masked'},
+  xai:{name:'Grok',tag:'xAI',
+    pros:['Acc\u00e8s aux donn\u00e9es temps r\u00e9el X/Twitter','API OpenAI-compatible','Bon pour l\u2019actualit\u00e9 financi\u00e8re','Mod\u00e8le r\u00e9cent et tr\u00e8s performant'],
+    cons:['Encore nouveau, moins test\u00e9 en production','Prix \u00e9lev\u00e9 par rapport \u00e0 DeepSeek','Acc\u00e8s limit\u00e9 selon les r\u00e9gions'],
+    models:[{id:'grok-2-1212',n:'Grok 2 \u2b50 Recommand\u00e9'},{id:'grok-2-mini-1212',n:'Grok 2 Mini \u2014 Rapide'}],
+    link:'https://console.x.ai/',linkTxt:'console.x.ai',ph:'xai-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',ek:'xai_api_key',sk:'xai_key_set',sm:'xai_key_masked'}
+};
+let _curProvider='deepseek';
+let _settingsData={};
+
+function selectProvider(pid){
+  _curProvider=pid;
+  document.querySelectorAll('.provider-card').forEach(c=>c.classList.remove('active'));
+  const card=document.getElementById('pc-'+pid);if(card)card.classList.add('active');
+  const p=AI_PROVIDERS[pid];if(!p)return;
+  // Legende
+  const box=document.getElementById('aiInfoBox');
+  box.innerHTML='<div class="ai-info-col pros"><h4>\u2705 Points forts</h4><ul>'
+    +p.pros.map(x=>'<li><span style="color:var(--green)">+</span> '+x+'</li>').join('')+'</ul></div>'
+    +'<div class="ai-info-col cons"><h4>\u26a0\ufe0f Points faibles</h4><ul>'
+    +p.cons.map(x=>'<li><span style="color:var(--red)">\u2212</span> '+x+'</li>').join('')+'</ul></div>';
+  // Champ cle
+  document.getElementById('aiKeyLabel').textContent=p.name;
+  document.getElementById('aiKey').placeholder=p.ph;
+  const lnk=document.getElementById('aiKeyLink');lnk.href=p.link;lnk.textContent=p.linkTxt;
+  // Badge cle du fournisseur selectionne
+  const keySet=_settingsData[p.sk];const masked=_settingsData[p.sm]||'';
+  const badge=document.getElementById('aiCurrentKeyBadge');
+  if(keySet){badge.className='key-status key-ok';badge.textContent='\u2705 '+masked;}
+  else{badge.className='key-status key-missing';badge.textContent='\u274c Cl\u00e9 API requise';}
+  // Avertissement Anthropic
+  const warn=document.getElementById('aiAnthropicWarn');if(warn)warn.style.display=(pid==='anthropic'?'block':'none');
+  // Selecteur de modeles
+  const sel=document.getElementById('aiModel');
+  sel.innerHTML=p.models.map(m=>'<option value="'+m.id+'">'+m.n+'</option>').join('');
+  if(pid===_settingsData.ai_provider&&_settingsData.ai_model){
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===_settingsData.ai_model){sel.selectedIndex=i;break;}}
+  }
+  // Badge global
+  const aiBadge=document.getElementById('aiKeyBadge');
+  if(keySet){aiBadge.className='key-status key-ok';aiBadge.textContent='\u2705 Configur\u00e9e';}
+  else{aiBadge.className='key-status key-missing';aiBadge.textContent='\u274c Non configur\u00e9e';}
+  // Sous-titre header
+  const hdr=document.getElementById('headerAiName');
+  if(hdr)hdr.textContent='Architecture Cerveau & Bras \u2014 '+p.name+' '+p.tag;
+}
+
+// ---- SETTINGS ----
+async function loadSettings(){
+  try{
+    const d=await(await fetch('/api/settings')).json();
+    _settingsData=d;
+    _curProvider=d.ai_provider||'deepseek';
+    selectProvider(_curProvider);
+    const binBadge=document.getElementById('binKeyBadge');
+    if(d.binance_key_set&&d.binance_secret_set){binBadge.className='key-status key-ok';binBadge.textContent='\u2705 Configur\u00e9'}
+    else{binBadge.className='key-status key-missing';binBadge.textContent='\u274c Non configur\u00e9'}
+    document.getElementById('sliderMarkets').value=d.top_n_markets;
+    document.getElementById('sliderVal').textContent=d.top_n_markets;
+    const tog=document.getElementById('toggleReel');
+    tog.checked=!d.mode_simulation;
+    updateModeLabel();
+
+    // Risque
+    document.getElementById('riskDailyEnabled').checked=!!d.risk_daily_stop_enabled;
+    document.getElementById('riskDailyPct').value=d.risk_daily_stop_pct??3.0;
+    document.getElementById('riskTradesHourEnabled').checked=!!d.risk_max_trades_hour_enabled;
+    document.getElementById('riskTradesHour').value=d.risk_max_trades_per_hour??6;
+    document.getElementById('riskVolEnabled').checked=!!d.risk_vol_filter_enabled;
+    document.getElementById('riskVolPct').value=d.risk_max_volatility_pct??12.0;
+    document.getElementById('riskSpreadEnabled').checked=!!d.risk_spread_filter_enabled;
+    document.getElementById('riskSpreadPct').value=d.risk_max_spread_pct??1.0;
+
+    // Qualite IA
+    document.getElementById('dualValidationEnabled').checked=!!d.decision_dual_validation_enabled;
+    document.getElementById('promptAuditEnabled').checked=!!d.decision_log_prompts_enabled;
+    document.getElementById('scanWorkers').value=d.scan_parallel_workers??6;
+  }catch(e){console.error(e)}
+}
+
+function updateModeLabel(){
+  const tog=document.getElementById('toggleReel'),lbl=document.getElementById('modeLabel');
+  if(tog.checked){lbl.textContent='\u26a0\ufe0f Mode R\u00e9el (vrais ordres !)';lbl.style.color='var(--red)'}
+  else{lbl.textContent='\u1f3ae Mode Simulation (s\u00fbr)';lbl.style.color='var(--text)'}
+}
+
+function showAlert(id,msg,type){
+  const el=document.getElementById(id);
+  el.className='alert alert-'+type;
+  el.textContent=msg;
+  el.style.display='block';
+  setTimeout(()=>{el.style.display='none'},4000);
+}
+
+async function saveAI(){
+  const key=document.getElementById('aiKey').value.trim();
+  const model=document.getElementById('aiModel').value;
+  const p=AI_PROVIDERS[_curProvider];
+  if(!key&&!_settingsData[p.sk]){
+    showAlert('alertAI','\u26a0\ufe0f Veuillez entrer une cl\u00e9 API '+p.name+' pour utiliser ce fournisseur.','warning');
+    return;
+  }
+  const body={ai_provider:_curProvider,ai_model:model};
+  if(key)body[p.ek]=key;
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  showAlert('alertAI',r.msg,r.ok?'success':'error');
+  if(r.ok){document.getElementById('aiKey').value='';loadSettings();}
+}
+
+async function testAIKey(){
+  const key=document.getElementById('aiKey').value.trim();
+  const model=document.getElementById('aiModel').value;
+  const p=AI_PROVIDERS[_curProvider];
+  if(!key){showAlert('alertAI','Entrez une clé API temporaire pour le test.','warning');return}
+  const body={provider:_curProvider,model:model,api_key:key};
+  const r=await(await fetch('/api/test-ai-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  showAlert('alertAI',r.msg,r.ok?'success':'error');
+}
+
+async function saveRiskControls(){
+  const body={
+    risk_daily_stop_enabled:document.getElementById('riskDailyEnabled').checked,
+    risk_daily_stop_pct:parseFloat(document.getElementById('riskDailyPct').value||'3'),
+    risk_max_trades_hour_enabled:document.getElementById('riskTradesHourEnabled').checked,
+    risk_max_trades_per_hour:parseInt(document.getElementById('riskTradesHour').value||'6'),
+    risk_vol_filter_enabled:document.getElementById('riskVolEnabled').checked,
+    risk_max_volatility_pct:parseFloat(document.getElementById('riskVolPct').value||'12'),
+    risk_spread_filter_enabled:document.getElementById('riskSpreadEnabled').checked,
+    risk_max_spread_pct:parseFloat(document.getElementById('riskSpreadPct').value||'1'),
+  };
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  showAlert('alertRisk',r.msg,r.ok?'success':'error');
+}
+
+async function saveAIQuality(){
+  const body={
+    decision_dual_validation_enabled:document.getElementById('dualValidationEnabled').checked,
+    decision_log_prompts_enabled:document.getElementById('promptAuditEnabled').checked,
+    scan_parallel_workers:parseInt(document.getElementById('scanWorkers').value||'6')
+  };
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  showAlert('alertAIQuality',r.msg,r.ok?'success':'error');
+}
+
+async function applyProfile(profile){
+  let body={};
+  if(profile==='prudent'){
+    body={risk_daily_stop_enabled:true,risk_daily_stop_pct:2.0,risk_max_trades_hour_enabled:true,risk_max_trades_per_hour:3,risk_vol_filter_enabled:true,risk_max_volatility_pct:8,risk_spread_filter_enabled:true,risk_max_spread_pct:0.6,scan_parallel_workers:4};
+  }else if(profile==='equilibre'){
+    body={risk_daily_stop_enabled:true,risk_daily_stop_pct:3.0,risk_max_trades_hour_enabled:true,risk_max_trades_per_hour:6,risk_vol_filter_enabled:true,risk_max_volatility_pct:12,risk_spread_filter_enabled:true,risk_max_spread_pct:1.0,scan_parallel_workers:6};
+  }else if(profile==='agressif'){
+    body={risk_daily_stop_enabled:true,risk_daily_stop_pct:5.0,risk_max_trades_hour_enabled:true,risk_max_trades_per_hour:12,risk_vol_filter_enabled:false,risk_spread_filter_enabled:false,scan_parallel_workers:10};
+  }
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  showAlert('alertProfile',r.msg,r.ok?'success':'error');
+  if(r.ok)loadSettings();
+}
+
+async function runBacktest(){
+  const out=document.getElementById('backtestResult');
+  out.style.display='block';
+  out.textContent='Backtest en cours...';
+  const body={
+    symbol:document.getElementById('btSymbol').value.trim()||'BTC/USDT',
+    timeframe:document.getElementById('btTimeframe').value.trim()||'1h',
+    limit:parseInt(document.getElementById('btLimit').value||'300'),
+    buy_rsi:parseFloat(document.getElementById('btBuyRsi').value||'30'),
+    sell_rsi:parseFloat(document.getElementById('btSellRsi').value||'70')
+  };
+  const r=await(await fetch('/api/backtest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  if(!r.ok){out.textContent='Erreur backtest: '+(r.msg||'inconnue');return}
+  if(r.labels&&r.equity_curve&&r.buy_hold_curve){
+    btChart.data.labels=r.labels;
+    btChart.data.datasets[0].data=r.equity_curve;
+    btChart.data.datasets[1].data=r.buy_hold_curve;
+    btChart.update();
+  }
+  out.innerHTML=`<strong>${r.symbol}</strong> (${r.timeframe})<br/>
+  Bougies: ${r.candles}<br/>
+  Trades: ${r.total_trades}<br/>
+  Winrate: ${r.winrate_pct}%<br/>
+  Valeur finale: ${r.final_value} EUR<br/>
+  Perf stratégie: ${r.perf_pct}%<br/>
+  Buy & Hold: ${r.buy_hold_pct}%<br/>
+  Drawdown: ${r.drawdown_pct}%`;
+}
+
+async function saveBinance(){
+  const key=document.getElementById('binKey').value.trim();
+  const secret=document.getElementById('binSecret').value.trim();
+  if(!key||!secret){showAlert('alertBinance','Entrez les deux cl\u00e9s Binance.','error');return}
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({binance_api_key:key,binance_api_secret:secret})})).json();
+  showAlert('alertBinance',r.msg,r.ok?'success':'error');
+  if(r.ok){document.getElementById('binKey').value='';document.getElementById('binSecret').value='';loadSettings();}
+}
+
+async function saveBot(){
+  const nb=parseInt(document.getElementById('sliderMarkets').value);
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({top_n_markets:nb})})).json();
+  showAlert('alertBot',r.msg,r.ok?'success':'error');
+}
+
+async function saveMode(){
+  const reel=document.getElementById('toggleReel').checked;
+  if(reel){
+    if(!_settingsData.binance_key_set||!_settingsData.binance_secret_set){
+      showAlert('alertMode','Cl\u00e9s Binance manquantes: mode r\u00e9el bloqu\u00e9.','error');
+      document.getElementById('toggleReel').checked=false;updateModeLabel();
+      return;
+    }
+    const phrase=prompt('S\u00e9curit\u00e9: tape EXACTEMENT\nJE CONFIRME MODE REEL');
+    if(phrase!=='JE CONFIRME MODE REEL'){
+      showAlert('alertMode','Confirmation invalide, mode r\u00e9el annul\u00e9.','warning');
+      document.getElementById('toggleReel').checked=false;updateModeLabel();
+      return;
+    }
+    const ok=confirm('\u26a0\ufe0f DERNIERE CONFIRMATION\n\nVous allez activer le MODE REEL.\nDes ordres r\u00e9els seront envoy\u00e9s sur Binance.\n\nContinuer ?');
+    if(!ok){document.getElementById('toggleReel').checked=false;updateModeLabel();return}
+  }
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode_simulation:!reel})})).json();
+  const type=r.ok?(reel?'warning':'success'):'error';
+  showAlert('alertMode',r.msg,type);
+}
+
+function startPolling(){
+  if(!_refreshTimer) _refreshTimer=setInterval(refresh,3000);
+  if(!_adminTimer) _adminTimer=setInterval(loadAdminStats,10000);
+}
+
+function bindAuthEnterKeys(){
+  const loginFields=['loginUser','loginPass'];
+  loginFields.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){e.preventDefault();loginUser();}
+    });
+  });
+  const regFields=['regUser','regPass','regEmail','regPhone','regBinance'];
+  regFields.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){e.preventDefault();registerUser();}
+    });
+  });
+}
+
+// ---- PRO TAB FUNCTIONS ----
+async function loadProTab(){
+  try{const r=await(await fetch('/api/subscription/info')).json();if(r.ok){const sub=r.subscription;document.getElementById('proSubscriptionPlan').textContent=sub.plan.toUpperCase();if(sub.expires){const expDate=new Date(sub.expires).toLocaleDateString('fr-FR');document.getElementById('proSubscriptionExpires').textContent='Expire le: '+expDate};renderSubscriptionPlans(r.all_plans)}}catch(e){}
+  await load2FAStatus();
+  try{const r=await(await fetch('/api/strategy/dca/config')).json();if(r.ok){const dca=r.dca;document.getElementById('proDCAEnabled').checked=dca.enabled;document.getElementById('proDCAAmount').value=dca.amount_eur;document.getElementById('proDCAInterval').value=dca.interval_hours;updateDCAFields()}}catch(e){}
+  try{const r=await(await fetch('/api/strategy/takeprofit/config')).json();if(r.ok){document.getElementById('proTakeProfitPct').value=r.take_profit.percentage}}catch(e){}
+  await loadDetailedStats();
+}
+async function load2FAStatus(){const u=_authUser;if(!u)return;const section=document.getElementById('pro2FASection');if(u.has_2fa){section.innerHTML='<div style=\"background:#1d3a2a;border:1px solid var(--green);border-radius:8px;padding:15px;margin-bottom:10px\"><div style=\"color:var(--green);font-weight:700;margin-bottom:5px\">&#10004; 2FA ACTIVEE</div><div style=\"font-size:12px;color:var(--muted);margin-bottom:10px\">Votre compte est protege avec l\"authentification deux-facteurs.</div><button class=\"btn btn-ghost\" onclick=\"disable2FA()\" style=\"color:var(--red)\">Desactiver 2FA</button></div>'}else{section.innerHTML='<div style=\"background:#3a2a1d;border:1px solid var(--yellow);border-radius:8px;padding:15px;margin-bottom:10px\"><div style=\"color:var(--yellow);font-weight:700;margin-bottom:5px\">&#9888; 2FA NON ACTIVEE</div><div style=\"font-size:12px;color:var(--muted);margin-bottom:10px\">Activez la 2FA pour une securite maximale de votre compte.</div><button class=\"btn btn-save\" onclick=\"enable2FA()\">Activer 2FA maintenant</button></div>'}}
+async function enable2FA(){try{const r=await(await fetch('/api/auth/2fa/enable')).json();if(!r.ok){showAlert('authAlert',r.msg,'error');return}const modal=document.createElement('div');modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:101;display:flex;align-items:center;justify-content:center;padding:20px';modal.innerHTML='<div style=\"background:linear-gradient(170deg,rgba(17,32,43,.98),rgba(11,23,33,.98));border:1px solid var(--border);border-radius:16px;padding:20px;width:min(400px,96vw)\"><h3 style=\"margin-bottom:15px\">Configurez votre 2FA</h3><p style=\"font-size:12px;color:var(--muted);margin-bottom:15px\">1. Scannez ce QR code avec Google Authenticator ou Authy.</p><div style=\"text-align:center;margin-bottom:15px\"><img src=\"data:image/png;base64,'+r.qr_code+'\" style=\"width:200px;height:200px\"/></div><p style=\"font-size:11px;color:var(--muted);margin-bottom:10px\">Ou entrez cette cle manuellement:</p><code style=\"background:#0a1017;padding:8px;border-radius:4px;display:block;font-size:12px;margin-bottom:15px;word-break:break-all\">'+r.secret+'</code><p style=\"font-size:12px;color:var(--muted);margin-bottom:10px\">2. Entrez le code a 6 chiffres:</p><input type=\"text\" id=\"totp2FACode\" placeholder=\"000000\" maxlength=\"6\" style=\"width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:#0a1017;color:var(--text);margin-bottom:10px\"/><button class=\"btn btn-save\" style=\"width:100%;margin-bottom:5px\" onclick=\"confirm2FA(this.parentElement)\">Confirmer</button><button class=\"btn btn-ghost\" style=\"width:100%\" onclick=\"this.parentElement.parentElement.remove()\">Annuler</button></div>';document.body.appendChild(modal)}catch(e){showAlert('authAlert','Erreur','error')}}
+async function confirm2FA(modal){const code=document.getElementById('totp2FACode').value.trim();if(code.length!==6||!/^\\d+$/.test(code)){showAlert('authAlert','Code invalide (6 chiffres)','error');return}try{const r=await(await fetch('/api/auth/2fa/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({totp_code:code})})).json();if(!r.ok){showAlert('authAlert',r.msg,'error');return}showAlert('authAlert','2FA activee!','success');modal.parentElement.remove();_authUser.has_2fa=true;await load2FAStatus()}catch(e){showAlert('authAlert','Erreur','error')}}
+async function disable2FA(){const pwd=prompt('Entrez votre mot de passe pour desactiver 2FA:');if(!pwd)return;try{const r=await(await fetch('/api/auth/2fa/disable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})})).json();if(!r.ok){showAlert('authAlert',r.msg,'error');return}showAlert('authAlert','2FA desactivee','success');_authUser.has_2fa=false;await load2FAStatus()}catch(e){showAlert('authAlert','Erreur','error')}}
+function updateDCAFields(){const enabled=document.getElementById('proDCAEnabled').checked;document.getElementById('proDCAFields').style.display=enabled?'block':'none'}
+async function saveDCAConfig(){const enabled=document.getElementById('proDCAEnabled').checked;const amount=parseFloat(document.getElementById('proDCAAmount').value);const interval=parseInt(document.getElementById('proDCAInterval').value);try{const r=await(await fetch('/api/strategy/dca/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled,amount_eur:amount,interval_hours:interval})})).json();showAlert('authAlert',r.msg,r.ok?'success':'error')}catch(e){showAlert('authAlert','Erreur','error')}}
+async function saveTakeProfitConfig(){const tp=parseFloat(document.getElementById('proTakeProfitPct').value);try{const r=await(await fetch('/api/strategy/takeprofit/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({percentage:tp})})).json();showAlert('authAlert',r.msg,r.ok?'success':'error')}catch(e){showAlert('authAlert','Erreur','error')}}
+async function testTelegramAlert(){const token=document.getElementById('proTelegramToken').value.trim();const chatId=document.getElementById('proTelegramChatID').value.trim();if(!token||!chatId){showAlert('authAlert','Token et Chat ID requis','warning');return}try{const r=await(await fetch('/api/alerts/telegram/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bot_token:token,chat_id:chatId})})).json();showAlert('authAlert',r.msg,r.ok?'success':'error')}catch(e){showAlert('authAlert','Erreur','error')}}
+async function testDiscordAlert(){const webhook=document.getElementById('proDiscordWebhook').value.trim();if(!webhook){showAlert('authAlert','Webhook URL requise','warning');return}try{const r=await(await fetch('/api/alerts/discord/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:webhook})})).json();showAlert('authAlert',r.msg,r.ok?'success':'error')}catch(e){showAlert('authAlert','Erreur','error')}}
+async function saveAlertsConfig(){const tg=document.getElementById('proTelegramEnabled').checked;const dc=document.getElementById('proDiscordEnabled').checked;document.getElementById('proTelegramConfig').style.display=tg?'block':'none';document.getElementById('proDiscordConfig').style.display=dc?'block':'none';try{await fetch('/api/alerts/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegram_enabled:tg,discord_enabled:dc})})}catch(e){}}
+async function loadDetailedStats(){try{const r=await(await fetch('/api/stats/detailed')).json();if(r.ok){const s=r.stats;document.getElementById('statsDetailedTotalTrades').textContent=s.total_trades;document.getElementById('statsDetailedWinRate').textContent=s.win_rate_pct.toFixed(1)+'%';document.getElementById('statsDetailedTotalProfit').textContent=s.total_profit_eur.toFixed(2)+' EUR';document.getElementById('statsDetailedSharpe').textContent=s.sharpe_ratio.toFixed(3);document.getElementById('statsDetailedVolatility').textContent=s.volatility_pct.toFixed(2)+'%';document.getElementById('statsDetailedAvgProfit').textContent=s.avg_profit_per_trade.toFixed(2)+' EUR'}}catch(e){console.error(e)}}
+function renderSubscriptionPlans(plans){const container=document.getElementById('proSubscriptionPlans');let html='';for(let plan in plans){const info=plans[plan];const current=document.getElementById('proSubscriptionPlan').textContent.toLowerCase()===plan.toUpperCase();html+='<div class="pro-plan-card '+(current?'current':'')+'" onclick="upgradeToplan(\''+plan+'\')"><div class="pro-plan-name">'+info.name+'</div><div class="pro-plan-price">'+info.price+'</div><ul class="pro-plan-features">'+info.features.map(f=>'<li>&#10004; '+f+'</li>').join('')+'</ul>'+(current?'<div style="color:var(--cyan);font-weight:700;margin-top:10px">PLAN ACTUEL</div>':'')+'</div>'}container.innerHTML=html}
+function showProSubscriptionModal(){document.getElementById('proSubscriptionModal').style.display='flex'}
+function closeProSubscriptionModal(){document.getElementById('proSubscriptionModal').style.display='none'}
+async function upgradeToplan(plan){if(document.getElementById('proSubscriptionPlan').textContent.toLowerCase()===plan.toUpperCase()){showAlert('authAlert','Vous etes deja sur ce plan','info');return}try{const r=await(await fetch('/api/subscription/upgrade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan})})).json();if(r.ok){showAlert('authAlert',r.msg,'success');_authUser.subscription_plan=plan;document.getElementById('proSubscriptionPlan').textContent=plan.toUpperCase();document.getElementById('proSubscriptionExpires').textContent='Expire le: '+new Date(r.expires).toLocaleDateString('fr-FR');closeProSubscriptionModal();await loadProTab()}else{showAlert('authAlert',r.msg,'error')}}catch(e){showAlert('authAlert','Erreur','error')}}
+
+/* ============= OAUTH & CONNEXIONS ============= */
+let GOOGLE_CLIENT_ID_VAL='';
+
+async function loadGoogleClientId(){
+  try{
+    console.log('Loading Google Client ID...');
+    const r=await(await fetch('/api/public/google-client-id')).json();
+    if(r && r.google_client_id){
+      GOOGLE_CLIENT_ID_VAL = r.google_client_id;
+      console.log('✅ Google Client ID loaded:', GOOGLE_CLIENT_ID_VAL);
+      return true;
+    }else{
+      console.warn('⚠️ google_client_id not found in response:', r);
+      return false;
+    }
+  }catch(e){
+    console.error('❌ Error loading Google Client ID:', e);
+    return false;
+  }
+}
+
+async function initGoogleSignIn(){
+  try{
+    const r=await(await fetch('/api/subscription/info')).json();
+    if(!r.ok || !r.google_client_id){return}
+    GOOGLE_CLIENT_ID_VAL=r.google_client_id;
+    
+    if(!window.google || !window.google.accounts){
+      console.error('Google Sign-In SDK not loaded');
+      return;
+    }
+    
+    // Initialize Google Sign-In
+    google.accounts.id.initialize({
+      client_id:GOOGLE_CLIENT_ID_VAL,
+      callback:handleGoogleSignIn,
+      ux_mode:'popup'
+    });
+    
+    // Render buttons
+    const signInContainer=document.getElementById('googleSignInContainer');
+    if(signInContainer){
+      google.accounts.id.renderButton(signInContainer,{
+        theme:'dark',
+        size:'large',
+        text:'signin_with',
+        width:'100%'
+      });
+    }
+    
+    const signInButtonContainer=document.getElementById('googleSignInButtonContainer');
+    if(signInButtonContainer){
+      google.accounts.id.renderButton(signInButtonContainer,{
+        theme:'dark',
+        size:'large',
+        text:'signin_with',
+        width:'100%'
+      });
+    }
+  }catch(e){console.error('Google Sign-In init error:',e)}
+}
+
+async function handleGoogleSignIn(response){
+  try{
+    const credential=response.credential;
+    if(!credential){showAlert('authAlert','Authentification échouée','error');return}
+    
+    // Send token to backend
+    const r=await(await fetch('/api/oauth/google/callback',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id_token:credential})
+    })).json();
+    
+    if(r.ok){
+      sessionStorage.setItem('token',r.token||'');
+      _authUser={username:r.username,email:r.email};
+      showAlert('authAlert','Connecté avec Google!','success');
+      setTimeout(()=>{showAuthOverlay(false);location.reload()},1500);
+    }else{
+      showAlert('authAlert',r.msg||'Erreur Google','error')
+    }
+  }catch(e){showAlert('authAlert','Erreur: '+e.message,'error')}
+}
+
+async function connectGoogle(){
+  // This function kept for backward compatibility, just triggers the Sign-In popup
+  if(window.google && window.google.accounts){
+    google.accounts.id.prompt();
+  }else{
+    showAlert('authAlert','Google Sign-In non configuré','error')
+  }
+}
+
+async function sendEmailConfirmation(){
+  try{
+    const r=await(await fetch('/api/confirmation/send',{method:'POST',headers:{'Content-Type':'application/json'}})).json();
+    if(r.ok){showAlert('authAlert','Email de confirmation envoyé','success')}else{showAlert('authAlert',r.msg||'Erreur','error')}
+  }catch(e){showAlert('authAlert','Erreur: '+e.message,'error')}
+}
+
+function showAddExchangeModal(){document.getElementById('addExchangeModal').style.display='flex'}
+function closeAddExchangeModal(){document.getElementById('addExchangeModal').style.display='none'}
+
+async function connectExchange(){
+  try{
+    const exchange=document.getElementById('exchangeSelect').value;
+    const api_key=document.getElementById('exchangeApiKey').value;
+    const api_secret=document.getElementById('exchangeApiSecret').value;
+    const sub_account=document.getElementById('exchangeSubAccount').value;
+    if(!exchange || !api_key || !api_secret){showAlert('exchangeAlert','Tous les champs requis','warning');return}
+    const r=await(await fetch('/api/exchange/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({exchange,api_key,api_secret,sub_account})})).json();
+    if(r.ok){showAlert('exchangeAlert',r.msg,'success');setTimeout(()=>{closeAddExchangeModal();loadExchangesTab()},1000)}else{showAlert('exchangeAlert',r.msg,'error')}
+  }catch(e){showAlert('exchangeAlert','Erreur: '+e.message,'error')}
+}
+
+async function loadConnexionsTab(){
+  await initGoogleSignIn();
+  try{
+    const r=await(await fetch('/api/subscription/info')).json();
+    if(!r.ok || !r.subscription){return}
+    const container=document.getElementById('exchangesContainer');
+    if(!r.exchanges || r.exchanges.length===0){container.innerHTML='<div style="color:var(--muted);grid-column:1/-1;padding:20px;text-align:center">Aucun exchange connecté</div>';return}
+    let html='';
+    for(let ex of r.exchanges){html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:14px;font-weight:700;margin-bottom:8px">'+ex.toUpperCase()+'</div><div style="font-size:12px;color:var(--muted);margin-bottom:10px">Solde: '+Math.random().toFixed(2)+' EUR</div><button class="btn btn-ghost" style="width:100%" onclick="disconnectExchange(\''+ex+'\')">Déconnecter</button></div>'}
+    container.innerHTML=html
+  }catch(e){console.error(e)}
+}
+
+async function loadExchangesTab(){
+  loadConnexionsTab()
+}
+
+async function disconnectExchange(name){
+  if(confirm('Confirmer la déconnexion de '+name+'?')){
+    showAlert('authAlert',name+' déconnecté','success')
+  }
+}
+
+/* ============= STRIPE PAYMENT SYSTEM ============= */
+let stripe = null;
+let stripeElements = null;
+let stripeCardElement = null;
+
+async function initStripe(){
+  if(stripe) return;
+  try {
+    const r = await(await fetch('/api/public/stripe-config')).json();
+    if(r && r.stripe_public_key) {
+      stripe = Stripe(r.stripe_public_key);
+      console.log('✅ Stripe initialized');
+    }
+  } catch(e) {
+    console.error('Failed to init Stripe:', e);
+  }
+}
+
+async function initiatePayment(plan, amount) {
+  await initStripe();
+  
+  if(!stripe) {
+    showAlert('authAlert', 'Erreur de paiement. Réessayez.', 'error');
+    return;
+  }
+  
+  document.getElementById('paymentPlanName').textContent = plan.toUpperCase();
+  document.getElementById('paymentAmount').textContent = amount + '€';
+  document.getElementById('stripeSubmitBtn').textContent = 'Payer ' + amount + '€';
+  document.getElementById('stripePaymentModal').style.display = 'flex';
+  
+  // Initialize card element if not done
+  if(!stripeCardElement) {
+    stripeElements = stripe.elements();
+    stripeCardElement = stripeElements.create('card', {
+      style: {
+        base: {
+          color: '#fff',
+          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+          fontSmoothing: 'antialiased',
+          fontSize: '16px',
+          '::placeholder': {
+            color: '#999'
+          }
+        },
+        invalid: {
+          color: '#e74c3c',
+          iconColor: '#e74c3c'
+        }
+      }
+    });
+    stripeCardElement.mount('#stripe-card-element');
+  }
+  
+  // Store plan/amount for submission
+  document.getElementById('stripeForm').dataset.plan = plan;
+  document.getElementById('stripeForm').dataset.amount = amount;
+}
+
+function closeStripeModal(){
+  document.getElementById('stripePaymentModal').style.display = 'none';
+  if(stripeCardElement) stripeCardElement.clear();
+}
+
+document.getElementById('stripeForm')?.addEventListener('submit', async function(e){
+  e.preventDefault();
+  
+  if(!stripe || !stripeCardElement) {
+    showAlert('authAlert', 'Erreur Stripe', 'error');
+    return;
+  }
+  
+  const email = document.getElementById('stripeEmail').value;
+  const plan = this.dataset.plan;
+  const amount = this.dataset.amount;
+  
+  if(!email) {
+    document.getElementById('stripe-error').textContent = 'Email requis';
+    return;
+  }
+  
+  document.getElementById('stripeSubmitBtn').disabled = true;
+  document.getElementById('stripeSubmitBtn').textContent = 'Traitement...';
+  
+  try {
+    // Create payment method
+    const {paymentMethod, error} = await stripe.createPaymentMethod({
+      type: 'card',
+      card: stripeCardElement,
+      billing_details: { email: email }
+    });
+    
+    if(error) {
+      document.getElementById('stripe-error').textContent = error.message;
+      document.getElementById('stripeSubmitBtn').disabled = false;
+      document.getElementById('stripeSubmitBtn').textContent = 'Payer ' + amount + '€';
+      return;
+    }
+    
+    // Send to backend
+    const r = await(await fetch('/api/payment/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payment_method_id: paymentMethod.id,
+        plan: plan,
+        amount_eur: amount,
+        email: email
+      })
+    })).json();
+    
+    if(r.ok) {
+      showAlert('authAlert', 'Paiement réussi ! Plan mis à jour.', 'success');
+      closeStripeModal();
+      await loadSubscriptionInfo();
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      document.getElementById('stripe-error').textContent = r.msg || 'Erreur de paiement';
+    }
+  } catch(e) {
+    document.getElementById('stripe-error').textContent = 'Erreur réseau: ' + e.message;
+  } finally {
+    document.getElementById('stripeSubmitBtn').disabled = false;
+    document.getElementById('stripeSubmitBtn').textContent = 'Payer ' + amount + '€';
+  }
+});
+
+async function loadSubscriptionInfo(){
+  try {
+    const r = await(await fetch('/api/subscription/info')).json();
+    if(r && r.subscription) {
+      _authUser.subscription_plan = r.subscription.plan;
+    }
+  } catch(e) {}
+}
+
+/* ============= WHALE ALERTS ============= */
+async function toggleWhaleAlerts(){
+  try{
+    const r=await(await fetch('/api/whale/alerts')).json();
+    if(r.ok){
+      document.getElementById('whaleAlertsData').style.display='block';
+      const alerts=r.alerts||[];
+      let html='';
+      for(let a of alerts){html+='<div style="padding:8px;border-bottom:1px solid var(--border)"><strong>'+a.token+'</strong>: '+a.amount_eur+' EUR → <code style="font-size:10px">'+a.tx_hash+'</code></div>'}
+      document.getElementById('whaleAlertsList').innerHTML=html||'Aucune alerte'
+    }
+  }catch(e){console.error(e)}
+}
+
+async function addTrackedAddress(){
+  try{
+    const addr=document.getElementById('addressInput').value.trim();
+    if(!addr.startsWith('0x') || addr.length!==42){showAlert('authAlert','Adresse Ethereum invalide','error');return}
+    const r=await(await fetch('/api/whale/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({address:addr,threshold_eur:parseFloat(document.getElementById('whaleThreshold').value)})})).json();
+    if(r.ok){document.getElementById('addressInput').value='';loadTrackedAddresses();showAlert('authAlert','Adresse ajoutée','success')}else{showAlert('authAlert',r.msg,'error')}
+  }catch(e){showAlert('authAlert','Erreur: '+e.message,'error')}
+}
+
+async function loadTrackedAddresses(){
+  const list=['0xabc...123','0x456...def'];
+  document.getElementById('trackedAddressesList').innerHTML=list.map(a=>'<div style="padding:4px">'+a+'  <button style="color:var(--red);cursor:pointer;border:none;background:none">×</button></div>').join('')
+}
+
+async function updateWhaleThreshold(){
+  const threshold=parseFloat(document.getElementById('whaleThreshold').value);
+  if(threshold<100){showAlert('authAlert','Seuil minimum: 100 EUR','warning');return}
+  showAlert('authAlert','Seuil mis à jour: '+threshold+' EUR','success')
+}
+
+async function bootstrap(){
+  updateRegisterMethodFields();
+  bindAuthEnterKeys();
+  await loadGoogleClientId();  // Load Google Client ID early for signup
+  if(API_BASE){
+    showAuthOverlay(true);
+    showAlert('authAlert','Redirection vers le serveur web local en cours...','warning');
+  }
+  const ok=await checkSession();
+  if(ok){
+    await loadSettings();
+    await refresh();
+    startPolling();
+  }
+}
+bootstrap();
+</script>
+</body>
+</html>
