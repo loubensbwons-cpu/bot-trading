@@ -1248,7 +1248,7 @@ function setAuthUser(user){
   chip.style.display='inline-flex';
   logout.style.display='inline-block';
   chipName.textContent=_authUser.username||'user';
-  admin.style.display=_authUser.is_admin?'inline':'none';
+  admin.style.display='none'; // Never show admin badge publicly
   adminBtn.style.display=_authUser.is_admin?'inline-block':'none';
 }
 
@@ -1755,9 +1755,7 @@ function bindAuthEnterKeys(){
     el.addEventListener('keydown', e=>{
       if(e.key==='Enter'){e.preventDefault();registerUser();}
     });
-  });
-}
-
+  }
 // ---- PRO TAB FUNCTIONS ----
 async function loadProTab(){
   try{const r=await(await fetch('/api/subscription/info')).json();if(r.ok){const sub=r.subscription;document.getElementById('proSubscriptionPlan').textContent=sub.plan.toUpperCase();if(sub.expires){const expDate=new Date(sub.expires).toLocaleDateString('fr-FR');document.getElementById('proSubscriptionExpires').textContent='Expire le: '+expDate};renderSubscriptionPlans(r.all_plans)}}catch(e){}

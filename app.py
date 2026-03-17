@@ -520,6 +520,46 @@ def is_subscription_active(user: dict) -> bool:
         return False
 
 # ---------------------------------------------------------------------------
+# DEVICE AUTHORIZATION (Admin Access Control)
+# ---------------------------------------------------------------------------
+def generate_device_fingerprint(request_obj) -> str:
+    """Generate a unique device fingerprint based on browser/OS/IP."""
+    user_agent = request_obj.headers.get('User-Agent', '')
+    ip_addr = request_obj.remote_addr or ''
+    # Create hash of User-Agent + IP (simple fingerprint)
+    fingerprint_str = f"{user_agent}|{ip_addr}"
+    return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:32]
+
+def is_device_authorized(username: str, device_id: str) -> bool:
+    """Check if device is authorized for admin access."""
+    try:
+        db = load_users()
+        for user in db.get("users", []):
+            if user.get("username") == username and user.get("is_admin"):
+                authorized_devices = user.get("authorized_devices", [])
+                # Always require confirmation for new devices (even first time)
+                return device_id in authorized_devices
+        return False
+    except Exception:
+        return False
+
+def register_device_for_user(username: str, device_id: str, device_name: str = "Device"):
+    """Register a new device for admin user."""
+    try:
+        db = load_users()
+        for user in db.get("users", []):
+            if user.get("username") == username and user.get("is_admin"):
+                if "authorized_devices" not in user:
+                    user["authorized_devices"] = []
+                if device_id not in user["authorized_devices"]:
+                    user["authorized_devices"].append(device_id)
+                    save_users(db)
+                    return True
+        return False
+    except Exception:
+        return False
+
+# ---------------------------------------------------------------------------
 # OAUTH & SOCIAL LOGIN
 # ---------------------------------------------------------------------------
 def verify_google_token(token: str) -> dict:
@@ -1286,6 +1326,53 @@ def api_admin_audit():
     except ValueError:
         limit_n = 50
     return jsonify({"ok": True, "events": read_admin_audit(limit_n)})
+
+@app.route("/api/admin/devices", methods=["GET"])
+@admin_required_api
+def api_admin_devices():
+    """List all authorized devices for current admin."""
+    username = session.get("username")
+    db = load_users()
+    for user in db.get("users", []):
+        if user.get("username") == username and user.get("is_admin"):
+            devices = user.get("authorized_devices", [])
+            return jsonify({"ok": True, "devices": devices, "count": len(devices)})
+    return jsonify({"ok": False, "msg": "Admin not found"})
+
+@app.route("/api/admin/devices/register", methods=["POST"])
+def api_admin_register_device():
+    """Register a new device for admin (requires password verification)."""
+    data = request.get_json() or {}
+    username = data.get("username", "")
+    password = data.get("password", "")
+    device_name = data.get("device_name", "New Device")
+    
+    try:
+        db = load_users()
+        user = next((u for u in db.get("users", []) if u.get("username") == username), None)
+        
+        if not user or not user.get("is_admin"):
+            return jsonify({"ok": False, "msg": "Not an admin account"})
+        
+        if not check_password_hash(user.get("password_hash", ""), password):
+            return jsonify({"ok": False, "msg": "Invalid password"})
+        
+        # Generate device ID
+        device_id = generate_device_fingerprint(request)
+        
+        # Register device
+        if "authorized_devices" not in user:
+            user["authorized_devices"] = []
+        
+        if device_id not in user["authorized_devices"]:
+            user["authorized_devices"].append(device_id)
+            save_users(db)
+            log_audit(username, "device_registered", f"Device registered: {device_name}")
+        
+        return jsonify({"ok": True, "msg": "Device registered successfully", "device_id": device_id})
+    except Exception as e:
+        print(f"[DEVICE REGISTER ERROR] {e}")
+        return jsonify({"ok": False, "msg": str(e)})
 
 @app.route("/api/status")
 @login_required_api
