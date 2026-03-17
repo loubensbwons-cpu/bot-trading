@@ -155,6 +155,9 @@ def validate_environment():
     
     if not os.getenv("STRIPE_SECRET_KEY"):
         warnings.append("⚠️  STRIPE_SECRET_KEY not set (payments won't work)")
+
+    if not ADMIN_PASSWORD_FROM_ENV:
+        warnings.append("⚠️  ADMIN_PASSWORD not set (admin password falls back to default value)")
     
     # Print warnings but don't block startup
     for warning in warnings:
@@ -184,7 +187,8 @@ USERS_FILE     = os.path.join(BASE_DIR, "users.json")
 ADMIN_AUDIT_FILE = os.path.join(BASE_DIR, "admin_audit.jsonl")
 
 ADMIN_USERNAME = "Jupiter"
-ADMIN_PASSWORD = "1234"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "1234")
+ADMIN_PASSWORD_FROM_ENV = bool(os.getenv("ADMIN_PASSWORD", "").strip())
 
 
 def now_str() -> str:
@@ -290,6 +294,8 @@ def ensure_admin_user() -> None:
         if str(u.get("username", "")).lower() == ADMIN_USERNAME.lower():
             u["is_admin"] = True
             if not u.get("password_hash"):
+                u["password_hash"] = generate_password_hash(ADMIN_PASSWORD)
+            elif ADMIN_PASSWORD_FROM_ENV and not check_password_hash(u.get("password_hash", ""), ADMIN_PASSWORD):
                 u["password_hash"] = generate_password_hash(ADMIN_PASSWORD)
             save_users(db)
             return
