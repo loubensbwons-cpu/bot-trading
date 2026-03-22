@@ -137,6 +137,7 @@ ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY", "")
 
 # Exchange Multi Support
 SUPPORTED_EXCHANGES = ["binance", "coinbase", "kraken", "kucoin", "bybit", "dydx"]
+IS_PRODUCTION = os.getenv("FLASK_ENV", "").strip().lower() == "production"
 
 # =========================================================================
 # ENVIRONMENT VALIDATION - Critical for security
@@ -144,9 +145,11 @@ SUPPORTED_EXCHANGES = ["binance", "coinbase", "kraken", "kucoin", "bybit", "dydx
 def validate_environment():
     """Validate critical environment variables."""
     warnings = []
+    secret_key = os.getenv("FLASK_SECRET_KEY", "")
+    admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
     
     # Check FLASK_SECRET_KEY
-    if os.getenv("FLASK_SECRET_KEY", "").startswith("your-super-secret-key") or len(os.getenv("FLASK_SECRET_KEY", "")) < 32:
+    if secret_key.startswith("your-super-secret-key") or len(secret_key) < 32:
         warnings.append("⚠️  FLASK_SECRET_KEY is weak or default. Set a strong random 50+ char key!")
     
     # Warn about missing optional security vars
@@ -156,16 +159,20 @@ def validate_environment():
     if not os.getenv("STRIPE_SECRET_KEY"):
         warnings.append("⚠️  STRIPE_SECRET_KEY not set (payments won't work)")
 
-    if not ADMIN_PASSWORD_FROM_ENV:
+    if not admin_password:
         warnings.append("⚠️  ADMIN_PASSWORD not set (admin password falls back to default value)")
+
+    if IS_PRODUCTION and (secret_key.startswith("your-super-secret-key") or len(secret_key) < 32):
+        raise RuntimeError("FLASK_SECRET_KEY must be set to a strong value in production.")
+
+    if IS_PRODUCTION and not admin_password:
+        raise RuntimeError("ADMIN_PASSWORD must be set in production.")
     
     # Print warnings but don't block startup
     for warning in warnings:
         print(warning)
     
     return len(warnings) == 0
-
-validate_environment()
 
 # ---------------------------------------------------------------------------
 # ETAT GLOBAL DU BOT
@@ -190,9 +197,26 @@ ADMIN_USERNAME = "Jupiter"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "1234")
 ADMIN_PASSWORD_FROM_ENV = bool(os.getenv("ADMIN_PASSWORD", "").strip())
 
+validate_environment()
+
 
 def now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def validate_password_strength(password: str, admin: bool = False) -> str:
+    min_length = 12 if admin else 10
+    if len(password) < min_length:
+        return f"Mot de passe trop court (min {min_length} caracteres)."
+    if not any(ch.islower() for ch in password):
+        return "Le mot de passe doit contenir au moins une minuscule."
+    if not any(ch.isupper() for ch in password):
+        return "Le mot de passe doit contenir au moins une majuscule."
+    if not any(ch.isdigit() for ch in password):
+        return "Le mot de passe doit contenir au moins un chiffre."
+    if not any(not ch.isalnum() for ch in password):
+        return "Le mot de passe doit contenir au moins un caractere special."
+    return ""
 
 
 def load_users() -> dict:
@@ -450,59 +474,45 @@ def get_totp_uri(username: str, secret: str) -> str:
 def verify_totp(secret: str, token: str) -> bool:
     """Verify a TOTP token (6-digit code)."""
     try:
-        totp = pyotp.TOTP(secret)
+        if not GOOGLE_CLIENT_ID or not token:
         return totp.verify(token, valid_window=1)
-    except Exception:
-        return False
 
-def generate_qr_code(uri: str) -> str:
-    """Generate a QR code as base64 image."""
-    try:
-        qr = qrcode.QRCode(version=1, box_size=10, border=2)
-        qr.add_data(uri)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="white", back_color="black")
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
-        return base64.b64encode(buffer.getvalue()).decode()
-    except Exception:
-        return ""
+        response = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": token},
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return {}
 
-def send_telegram_alert(message: str) -> bool:
-    """Send alert to Telegram if configured."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return False
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
+        data = response.json()
+        if data.get("aud") != GOOGLE_CLIENT_ID:
+            return {}
+        if data.get("iss") not in ["https://accounts.google.com", "accounts.google.com"]:
+            return {}
+        if data.get("email") and str(data.get("email_verified", "false")).lower() != "true":
+            return {}
+
+        exp = data.get("exp")
+        if exp:
+            try:
+                if int(exp) <= int(time.time()):
+                    return {}
+            except (TypeError, ValueError):
+                return {}
+
+        return {
+            "sub": data.get("sub", ""),
+            "email": data.get("email", ""),
+            "name": data.get("name", ""),
+            "picture": data.get("picture", ""),
         }
-        resp = requests.post(url, json=payload, timeout=5)
-        return resp.status_code == 200
+    except requests.RequestException as e:
+        print(f"[GOOGLE TOKEN NETWORK ERROR] {e}")
+        return {}
     except Exception as e:
-        print(f"[TELEGRAM ERROR] {e}")
-        return False
-
-def send_discord_alert(message: str) -> bool:
-    """Send alert to Discord if configured."""
-    if not DISCORD_WEBHOOK_URL:
-        return False
-    try:
-        payload = {"content": message}
-        resp = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=5)
-        return resp.status_code == 200
-    except Exception as e:
-        print(f"[DISCORD ERROR] {e}")
-        return False
-
-def get_subscription_plan(user: dict) -> str:
-    """Get user's subscription plan (free, pro, enterprise)."""
-    return user.get("subscription_plan", "free")
-
-def has_pro_features(user: dict) -> bool:
+        print(f"[GOOGLE TOKEN VERIFY ERROR] {e}")
+        return {}
     """Check if user has pro or enterprise access."""
     plan = get_subscription_plan(user)
     return plan in {"pro", "enterprise"}
@@ -571,55 +581,41 @@ def register_device_for_user(username: str, device_id: str, device_name: str = "
 def verify_google_token(token: str) -> dict:
     """Verify Google ID token and return user info."""
     try:
-        if not GOOGLE_CLIENT_ID:
+        if not GOOGLE_CLIENT_ID or not token:
             return {}
-        
-        # For production: decode and verify JWT signature using Google's public keys
-        # For development/testing: decode without verification (unsafe, development only)
-        if not jwt:
-            # Fallback: parse JWT payload without signature verification
-            import base64
+        response = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": token},
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return {}
+
+        data = response.json()
+        if data.get("aud") != GOOGLE_CLIENT_ID:
+            return {}
+        if data.get("iss") not in ["https://accounts.google.com", "accounts.google.com"]:
+            return {}
+        if data.get("email") and str(data.get("email_verified", "false")).lower() != "true":
+            return {}
+
+        exp = data.get("exp")
+        if exp:
             try:
-                parts = token.split('.')
-                if len(parts) != 3:
+                if int(exp) <= int(time.time()):
                     return {}
-                # Decode payload (add padding if necessary)
-                payload = parts[1]
-                padding = 4 - (len(payload) % 4)
-                if padding != 4:
-                    payload += '=' * padding
-                decoded = base64.urlsafe_b64decode(payload)
-                import json
-                data = json.loads(decoded)
-                
-                # Basic validation
-                if data.get('aud') == GOOGLE_CLIENT_ID and data.get('iss') in ['https://accounts.google.com', 'accounts.google.com']:
-                    return {
-                        "sub": data.get('sub', ''),
-                        "email": data.get('email', ''),
-                        "name": data.get('name', ''),
-                        "picture": data.get('picture', '')
-                    }
+            except (TypeError, ValueError):
                 return {}
-            except Exception as e:
-                print(f"[TOKEN PARSE ERROR] {e}")
-                return {}
-        
-        # Using PyJWT for proper verification (requires public key download)
-        # For now, use basic decode (unsafe for production)
-        try:
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            if decoded.get('aud') == GOOGLE_CLIENT_ID:
-                return {
-                    "sub": decoded.get('sub', ''),
-                    "email": decoded.get('email', ''),
-                    "name": decoded.get('name', ''),
-                    "picture": decoded.get('picture', '')
-                }
-            return {}
-        except Exception as e:
-            print(f"[JWT DECODE ERROR] {e}")
-            return {}
+
+        return {
+            "sub": data.get("sub", ""),
+            "email": data.get("email", ""),
+            "name": data.get("name", ""),
+            "picture": data.get("picture", ""),
+        }
+    except requests.RequestException as e:
+        print(f"[GOOGLE TOKEN NETWORK ERROR] {e}")
+        return {}
     except Exception as e:
         print(f"[GOOGLE TOKEN VERIFY ERROR] {e}")
         return {}
@@ -745,8 +741,9 @@ def api_auth_register():
         return jsonify({"ok": False, "msg": "Nom d'utilisateur invalide (3-32 caracteres)."})
     if any(ch in username for ch in [" ", "\t", "\n", "/", "\\"]):
         return jsonify({"ok": False, "msg": "Nom d'utilisateur invalide."})
-    if len(password) < 4:
-        return jsonify({"ok": False, "msg": "Mot de passe trop court (min 4 caracteres)."})
+    password_error = validate_password_strength(password)
+    if password_error:
+        return jsonify({"ok": False, "msg": password_error})
 
     allowed_methods = {"username", "gmail", "google", "telephone", "binance"}
     if signup_method not in allowed_methods:
@@ -796,13 +793,13 @@ def api_auth_login():
     u = find_user(username)
     if not u:
         record_login_attempt(username)
-        return jsonify({"ok": False, "msg": "Nom d'utilisateur introuvable."})
+        return jsonify({"ok": False, "msg": "Identifiants invalides."})
     if bool(u.get("disabled", False)):
         record_login_attempt(username)
-        return jsonify({"ok": False, "msg": "Compte desactive."})
+        return jsonify({"ok": False, "msg": "Identifiants invalides."})
     if not check_password_hash(u.get("password_hash", ""), password):
         record_login_attempt(username)
-        return jsonify({"ok": False, "msg": "Mot de passe incorrect."})
+        return jsonify({"ok": False, "msg": "Identifiants invalides."})
 
     # 2FA check
     if bool(u.get("totp_enabled", False)):
@@ -836,7 +833,7 @@ def api_auth_login():
 @app.route("/api/auth/logout", methods=["POST"])
 def api_auth_logout():
     username = session.get("username", "unknown")
-    session.pop("username", None)
+    session.clear()
     log_admin_event(username, "logout", {})
     return jsonify({"ok": True, "msg": "Deconnexion reussie."})
 
@@ -1245,9 +1242,10 @@ def api_admin_change_password():
     new_password = str(data.get("new_password", "")).strip()
 
     if str(u.get("username", "")) != ADMIN_USERNAME:
-        return jsonify({"ok": False, "msg": "Seul Jupiter peut changer le mot de passe admin."}), 403
-    if len(new_password) < 4:
-        return jsonify({"ok": False, "msg": "Nouveau mot de passe trop court (min 4)."})
+        return jsonify({"ok": False, "msg": "Action reservee au compte administrateur principal."}), 403
+    password_error = validate_password_strength(new_password, admin=True)
+    if password_error:
+        return jsonify({"ok": False, "msg": password_error})
     if not check_password_hash(u.get("password_hash", ""), old_password):
         return jsonify({"ok": False, "msg": "Ancien mot de passe invalide."})
 
@@ -1272,7 +1270,7 @@ def api_admin_user_status():
     if not username:
         return jsonify({"ok": False, "msg": "username requis."})
     if username.lower() == ADMIN_USERNAME.lower():
-        return jsonify({"ok": False, "msg": "Le compte admin Jupiter ne peut pas etre desactive."})
+        return jsonify({"ok": False, "msg": "Le compte administrateur principal ne peut pas etre desactive."})
 
     db = load_users()
     changed = False
@@ -1300,8 +1298,9 @@ def api_admin_reset_user_password():
 
     if not username:
         return jsonify({"ok": False, "msg": "username requis."})
-    if len(new_password) < 4:
-        return jsonify({"ok": False, "msg": "Mot de passe trop court (min 4)."})
+    password_error = validate_password_strength(new_password)
+    if password_error:
+        return jsonify({"ok": False, "msg": password_error})
 
     db = load_users()
     target = None
